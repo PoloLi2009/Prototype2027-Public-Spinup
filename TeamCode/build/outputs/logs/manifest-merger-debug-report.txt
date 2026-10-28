@@ -7,6 +7,7 @@ INJECTED from /Users/pololi/本地文稿/FIRST机器人/FTC代码/Prototype2027-
 MERGED from [:FtcRobotController] /Users/pololi/本地文稿/FIRST机器人/FTC代码/Prototype2027-Public-Spinup/FtcRobotController/build/intermediates/merged_manifest/debug/processDebugManifest/AndroidManifest.xml:2:1-78:12
 MERGED from [org.firstinspires.ftc:OnBotJava:12.0.0] /Users/pololi/.gradle/caches/9.1.0/transforms/e5f21073af06227e2355ef639046a624/transformed/OnBotJava-12.0.0/AndroidManifest.xml:34:1-41:12
 MERGED from [org.firstinspires.ftc:Blocks:12.0.0] /Users/pololi/.gradle/caches/9.1.0/transforms/361abb6a221215d8d0b2477242fb34a4/transformed/Blocks-12.0.0/AndroidManifest.xml:2:1-24:12
+MERGED from [com.acmerobotics.dashboard:dashboard:0.5.1] /Users/pololi/.gradle/caches/9.1.0/transforms/9bacd74eabc8f8cb7d88e5732eaa5378/transformed/dashboard-0.5.1/AndroidManifest.xml:2:1-7:12
 MERGED from [org.firstinspires.ftc:FtcCommon:12.0.0] /Users/pololi/.gradle/caches/9.1.0/transforms/dad254e52d27ed09cf77d54daabd69a1/transformed/FtcCommon-12.0.0/AndroidManifest.xml:3:1-183:12
 MERGED from [org.firstinspires.ftc:Inspection:12.0.0] /Users/pololi/.gradle/caches/9.1.0/transforms/35555f32a075b99488923dd911af52ca/transformed/Inspection-12.0.0/AndroidManifest.xml:2:1-30:12
 MERGED from [org.firstinspires.ftc:RobotServer:12.0.0] /Users/pololi/.gradle/caches/9.1.0/transforms/123ebf9f38b1f7d9cffa66ead5106dbe/transformed/RobotServer-12.0.0/AndroidManifest.xml:2:1-9:12
@@ -98,6 +99,8 @@ MERGED from [org.firstinspires.ftc:OnBotJava:12.0.0] /Users/pololi/.gradle/cache
 MERGED from [org.firstinspires.ftc:OnBotJava:12.0.0] /Users/pololi/.gradle/caches/9.1.0/transforms/e5f21073af06227e2355ef639046a624/transformed/OnBotJava-12.0.0/AndroidManifest.xml:39:5-44
 MERGED from [org.firstinspires.ftc:Blocks:12.0.0] /Users/pololi/.gradle/caches/9.1.0/transforms/361abb6a221215d8d0b2477242fb34a4/transformed/Blocks-12.0.0/AndroidManifest.xml:7:5-44
 MERGED from [org.firstinspires.ftc:Blocks:12.0.0] /Users/pololi/.gradle/caches/9.1.0/transforms/361abb6a221215d8d0b2477242fb34a4/transformed/Blocks-12.0.0/AndroidManifest.xml:7:5-44
+MERGED from [com.acmerobotics.dashboard:dashboard:0.5.1] /Users/pololi/.gradle/caches/9.1.0/transforms/9bacd74eabc8f8cb7d88e5732eaa5378/transformed/dashboard-0.5.1/AndroidManifest.xml:5:5-44
+MERGED from [com.acmerobotics.dashboard:dashboard:0.5.1] /Users/pololi/.gradle/caches/9.1.0/transforms/9bacd74eabc8f8cb7d88e5732eaa5378/transformed/dashboard-0.5.1/AndroidManifest.xml:5:5-44
 MERGED from [org.firstinspires.ftc:FtcCommon:12.0.0] /Users/pololi/.gradle/caches/9.1.0/transforms/dad254e52d27ed09cf77d54daabd69a1/transformed/FtcCommon-12.0.0/AndroidManifest.xml:8:5-44
 MERGED from [org.firstinspires.ftc:FtcCommon:12.0.0] /Users/pololi/.gradle/caches/9.1.0/transforms/dad254e52d27ed09cf77d54daabd69a1/transformed/FtcCommon-12.0.0/AndroidManifest.xml:8:5-44
 MERGED from [org.firstinspires.ftc:Inspection:12.0.0] /Users/pololi/.gradle/caches/9.1.0/transforms/35555f32a075b99488923dd911af52ca/transformed/Inspection-12.0.0/AndroidManifest.xml:7:5-44

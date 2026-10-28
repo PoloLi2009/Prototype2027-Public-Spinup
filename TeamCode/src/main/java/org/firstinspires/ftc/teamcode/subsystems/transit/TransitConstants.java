@@ -12,4 +12,11 @@ public final class TransitConstants {
     public static double gateOpenPosition = 0.72;
     public static double rampUpPosition = 0.18;
     public static double rampDownPosition = 0.78;
+
+    /**
+     * Required feed order: retract the blocking rod first, then raise the ramp.
+     * Tune these after measuring the actual servo travel time on the robot.
+     */
+    public static long gateRetractDelayMs = 250;
+    public static long rampRaiseDelayMs = 200;
 }

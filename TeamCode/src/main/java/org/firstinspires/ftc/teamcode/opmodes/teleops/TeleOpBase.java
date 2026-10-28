@@ -10,6 +10,8 @@ import org.firstinspires.ftc.teamcode.commands.ReverseIntakeCommand;
 import org.firstinspires.ftc.teamcode.commands.ShooterCommand;
 import org.firstinspires.ftc.teamcode.commands.TransitCommand;
 import org.firstinspires.ftc.teamcode.commands.TurretCommand;
+import org.firstinspires.ftc.teamcode.commands.TurretAlignCommand;
+import org.firstinspires.ftc.teamcode.subsystems.vision.Vision;
 import org.firstinspires.ftc.teamcode.subsystems.drive.Drive;
 import org.firstinspires.ftc.teamcode.subsystems.intake.Intake;
 import org.firstinspires.ftc.teamcode.subsystems.shooter.Shooter;
@@ -30,6 +32,8 @@ public abstract class TeleOpBase extends CommandOpMode {
     public Shooter shooter;
     public GamepadEx gamepadEx1;
     public GamepadEx gamepadEx2;
+    public Vision vision;
+    public TurretAlignCommand turretAlignCommand;
 
     @Override
     public void initialize() {
@@ -41,9 +45,14 @@ public abstract class TeleOpBase extends CommandOpMode {
         transit = new Transit(hardwareMap);
         turret = new Turret(hardwareMap);
         shooter = new Shooter(hardwareMap);
+        vision = new Vision();
+        turretAlignCommand = new TurretAlignCommand(turret, vision);
 
         drive.setDefaultCommand(new DriveCommand(drive, gamepadEx1));
-        turret.setDefaultCommand(new TurretCommand(turret, gamepadEx2));
+        turret.setDefaultCommand(turretAlignCommand);
+        // Manual D-pad override; release resumes the automatic default command.
+        new FunctionalButton(() -> gamepad2.dpad_left || gamepad2.dpad_right)
+                .whenHeld(new TurretCommand(turret, gamepadEx2));
         shooter.setDefaultCommand(new ShooterCommand(shooter, gamepadEx2));
 
         new FunctionalButton(() -> gamepadEx2.getTrigger(
@@ -80,6 +89,11 @@ public abstract class TeleOpBase extends CommandOpMode {
         telemetry.addData("Velocity ticks/s", shooter.getAverageVelocity());
         telemetry.addLine("----- Turret -----");
         telemetry.addData("Encoder ticks", turret.getTurretPos());
+        telemetry.addData("Turret degrees", turret.getAngleDegrees());
+        telemetry.addData("Target degrees", turret.getTargetDegrees());
+        telemetry.addData("Aim status", turretAlignCommand.getStatus());
+        telemetry.addData("Selected CELL", turretAlignCommand.getSelectedCell());
+        telemetry.addData("Target distance mm", turretAlignCommand.getDistanceMm());
         telemetry.update();
     }
 }
