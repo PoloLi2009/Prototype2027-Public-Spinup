@@ -4,73 +4,80 @@ import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import org.firstinspires.ftc.teamcode.subsystems.turret.Turret;
 import org.firstinspires.ftc.teamcode.subsystems.turret.TurretConstants;
-import org.firstinspires.ftc.teamcode.utils.TurretMath;
 
-/** Only the turret motor is initialized. Gamepad 1 controls target angle. */
+/** Manual turret control with automatic full-turn cable unwind at either limit. */
 @TeleOp(name = "Turret Limit Test", group = "Test")
 public class TurretLimitTest extends OpMode {
+    private static final double STICK_DEADBAND = 0.08;
+    private static final double REWIND_TRIGGER_MARGIN_DEGREES = 1.0;
+    private static final double REWIND_COMPLETE_MARGIN_DEGREES = 1.0;
+    private static final long REWIND_BURST_NANOS = 215_000_000L;
+    private static final double REWIND_PID_MIN_POWER = 0.20;
+    private static final double REWIND_PID_MAX_POWER = 0.50;
+    private static final double REWIND_PID_KP = 0.02;
+
     private Turret turret;
-    private double targetDegrees;
-    private int lastDirection;
-    private long nextRepeatNanos;
-    private String status = "HOLD";
-    private static final double STEP_DEGREES = 30;
-    private static final long INITIAL_REPEAT_NS = 500_000_000L;
-    private static final long REPEAT_NS = 250_000_000L;
+    private boolean rewinding;
+    private double rewindTargetDegrees;
+    private double rewindStartAngleDegrees;
+    private long rewindStartNanos;
 
     @Override
     public void init() {
         turret = new Turret(hardwareMap);
-        telemetry.addLine("Point turret forward BEFORE INIT. This position is zero.");
-        telemetry.addLine("Gamepad 1: D-pad left +30 / right -30; hold to repeat.");
+        telemetry.addLine("Point turret straight forward BEFORE INIT; this resets to 0 deg.");
+        telemetry.addLine("Gamepad 1 left stick X: turn turret; at +/-180 deg: auto unwind.");
         telemetry.update();
-    }
-
-    @Override
-    public void start() {
-        targetDegrees = 0;
-        lastDirection = 0;
     }
 
     @Override
     public void loop() {
-        long now = System.nanoTime();
-        // Both buttons pressed: no steps. Angle positive is counterclockwise.
-        int direction = gamepad1.dpad_left == gamepad1.dpad_right ? 0
-                : gamepad1.dpad_left ? 1 : -1;
-        if (direction != 0) {
-            if (direction != lastDirection) {
-                step(direction);
-                nextRepeatNanos = now + INITIAL_REPEAT_NS;
-            } else if (now >= nextRepeatNanos) {
-                step(direction);
-                nextRepeatNanos = now + REPEAT_NS;
+        double angle = turret.getAngleDegrees();
+        double stick = Math.abs(gamepad1.left_stick_x) > STICK_DEADBAND
+                ? gamepad1.left_stick_x : 0.0;
+        double min = TurretConstants.minDegrees();
+        double max = TurretConstants.maxDegrees();
+
+        if (rewinding) {
+            double direction = Math.signum(rewindTargetDegrees - rewindStartAngleDegrees);
+            long rewindElapsedNanos = System.nanoTime() - rewindStartNanos;
+            if (direction * (rewindTargetDegrees - angle) <= REWIND_COMPLETE_MARGIN_DEGREES) {
+                turret.stop();
+                rewinding = false;
+            } else if (rewindElapsedNanos < REWIND_BURST_NANOS) {
+                turret.rotate(direction);
+            } else {
+                turret.aimAtPhysicalDegrees(rewindTargetDegrees, REWIND_PID_MIN_POWER,
+                        REWIND_PID_MAX_POWER, REWIND_PID_KP);
             }
+        } else if (stick > 0 && angle >= max - REWIND_TRIGGER_MARGIN_DEGREES
+                && TurretConstants.travelDegrees >= 360.0) {
+            beginRewind(min);
+        } else if (stick < 0 && angle <= min + REWIND_TRIGGER_MARGIN_DEGREES
+                && TurretConstants.travelDegrees >= 360.0) {
+            beginRewind(max);
+        } else {
+            turret.rotate(stick * TurretConstants.manualPower);
         }
-        lastDirection = direction;
-        // Keep holding the last accepted target after button release.
-        boolean reachable = turret.aimAtDegrees(targetDegrees);
-        telemetry.addData("State", reachable ? status : "UNREACHABLE / STOPPED");
-        telemetry.addData("Current degrees", turret.getAngleDegrees());
-        telemetry.addData("Target degrees", turret.getTargetDegrees());
-        telemetry.addData("Error degrees", turret.getTargetDegrees() - turret.getAngleDegrees());
-        telemetry.addData("Encoder ticks", turret.getTurretPos());
-        telemetry.addData("Travel degrees", TurretConstants.travelDegrees);
-        telemetry.addData("Min / Max", "%.1f / %.1f",
-                TurretConstants.minDegrees(), TurretConstants.maxDegrees());
+
+        telemetry.addData("Mode", rewinding
+                ? (System.nanoTime() - rewindStartNanos < REWIND_BURST_NANOS
+                        ? "AUTO UNWIND FULL POWER" : "AUTO UNWIND PID") : "MANUAL");
+        telemetry.addData("Turret angle deg", "%.2f", turret.getAngleDegrees());
+        telemetry.addData("Motor encoder ticks", turret.getEncoderTicks());
+        telemetry.addData("Rewind target deg", rewinding ? rewindTargetDegrees : "--");
+        telemetry.addData("Rewind elapsed sec", rewinding
+                ? String.format("%.2f", (System.nanoTime() - rewindStartNanos) / 1e9) : "--");
+        telemetry.addData("Min / Max deg", "%.1f / %.1f", min, max);
         telemetry.update();
     }
 
-    private void step(int direction) {
-        double requested = targetDegrees + direction * STEP_DEGREES;
-        double equivalent = TurretMath.reachableDegrees(requested, turret.getAngleDegrees(),
-                TurretConstants.minDegrees(), TurretConstants.maxDegrees());
-        if (!Double.isFinite(equivalent)) {
-            status = "UNREACHABLE STEP: " + requested + " (holding last target)";
-            return;
-        }
-        status = Math.abs(equivalent - requested) > 1e-6 ? "REWIND" : "HOLD";
-        targetDegrees = equivalent;
+    private void beginRewind(double targetDegrees) {
+        rewindTargetDegrees = targetDegrees;
+        rewindStartAngleDegrees = turret.getAngleDegrees();
+        rewindStartNanos = System.nanoTime();
+        rewinding = true;
+        turret.rotate(Math.signum(rewindTargetDegrees - rewindStartAngleDegrees));
     }
 
     @Override

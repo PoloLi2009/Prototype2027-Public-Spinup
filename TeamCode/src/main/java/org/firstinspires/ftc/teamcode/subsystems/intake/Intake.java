@@ -29,14 +29,17 @@ public class Intake extends SubsystemBase {
     }
 
     public void setIntakeState(IntakeState intakeState) {
+        
         this.intakeState = intakeState;
     }
 
     public IntakeState getIntakeState() {
+
         return intakeState;
     }
 
     public void stop() {
+
         setIntakeState(IntakeState.STOP);
     }
 

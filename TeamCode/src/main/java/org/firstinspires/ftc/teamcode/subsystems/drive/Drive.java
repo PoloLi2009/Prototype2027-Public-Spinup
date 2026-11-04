@@ -34,7 +34,8 @@ public class Drive extends SubsystemBase {
     }
 
     public void moveRobot(double forward, double strafe, double turn) {
-        double correctedStrafe = strafe * DriveConstants.strafingBalance;
+        // This chassis moves opposite the requested lateral direction with the usual sign.
+        double correctedStrafe = -strafe * DriveConstants.strafingBalance;
         double denominator = Math.max(Math.abs(forward) + Math.abs(correctedStrafe)
                 + Math.abs(turn), 1.0);
 

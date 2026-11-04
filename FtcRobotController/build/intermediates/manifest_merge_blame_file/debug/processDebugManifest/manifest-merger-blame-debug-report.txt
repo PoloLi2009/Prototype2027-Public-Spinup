@@ -6,6 +6,8 @@
 6    android:versionName="12.0" >
 7
 8    <uses-sdk android:minSdkVersion="24" />
+8-->INJECTED
+8-->INJECTED
 9
 10    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 10-->/Users/pololi/本地文稿/FIRST机器人/FTC代码/Prototype2027-Public-Spinup/FtcRobotController/src/main/AndroidManifest.xml:7:3-79

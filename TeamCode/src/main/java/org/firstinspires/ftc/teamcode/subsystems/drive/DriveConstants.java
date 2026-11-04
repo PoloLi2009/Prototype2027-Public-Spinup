@@ -4,10 +4,10 @@ package org.firstinspires.ftc.teamcode.subsystems.drive;
 public final class DriveConstants {
     private DriveConstants() { }
 
-    public static String leftFrontMotorName = "frontLeft";
-    public static String leftBackMotorName = "backLeft";
-    public static String rightFrontMotorName = "frontRight";
-    public static String rightBackMotorName = "backRight";
+    public static String leftFrontMotorName = "leftFrontMotor";
+    public static String leftBackMotorName = "leftBackMotor";
+    public static String rightFrontMotorName = "rightFrontMotor";
+    public static String rightBackMotorName = "rightBackMotor";
 
     public static double strafingBalance = 1.00;
     public static double teleOpScale = 1.00;

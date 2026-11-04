@@ -19,7 +19,6 @@ public class ReverseIntakeCommand extends CommandBase {
     @Override
     public void initialize() {
         transit.setGateState(Transit.GateState.CLOSED);
-        transit.setRampState(Transit.RampState.DOWN);
     }
 
     @Override

@@ -1,0 +1,12 @@
+lib/arm64-v8a/libRobotCore.so->org.firstinspires.ftc:RobotCore:12.0.0
+lib/armeabi-v7a/libRobotCore.so->org.firstinspires.ftc:RobotCore:12.0.0
+lib/arm64-v8a/libEasyOpenCV.so->org.openftc:easyopencv:1.7.3
+lib/arm64-v8a/libturbojpeg.so->org.openftc:easyopencv:1.7.3
+lib/armeabi-v7a/libEasyOpenCV.so->org.openftc:easyopencv:1.7.3
+lib/armeabi-v7a/libturbojpeg.so->org.openftc:easyopencv:1.7.3
+lib/arm64-v8a/libapriltag.so->org.openftc:apriltag:2.1.0
+lib/armeabi-v7a/libapriltag.so->org.openftc:apriltag:2.1.0
+lib/arm64-v8a/libc++_shared.so->org.openftc:opencv-repackaged-bundled-dylibs:4.10.0-A
+lib/arm64-v8a/libopencv_java4.so->org.openftc:opencv-repackaged-bundled-dylibs:4.10.0-A
+lib/armeabi-v7a/libc++_shared.so->org.openftc:opencv-repackaged-bundled-dylibs:4.10.0-A
+lib/armeabi-v7a/libopencv_java4.so->org.openftc:opencv-repackaged-bundled-dylibs:4.10.0-A

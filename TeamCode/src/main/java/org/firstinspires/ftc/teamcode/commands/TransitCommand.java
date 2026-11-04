@@ -16,7 +16,6 @@ public class TransitCommand extends CommandBase {
     private enum FeedState {
         SAFE,
         RETRACTING_GATE,
-        RAISING_RAMP,
         FEEDING
     }
 
@@ -47,9 +46,8 @@ public class TransitCommand extends CommandBase {
 
         switch (feedState) {
             case SAFE:
-                // Step 1: move the blocking rod away while the ramp remains down.
+                // Move the blocking rod away before feeding.
                 transit.setGateState(Transit.GateState.OPEN);
-                transit.setRampState(Transit.RampState.DOWN);
                 intake.stop();
                 stateTimer.reset();
                 feedState = FeedState.RETRACTING_GATE;
@@ -57,16 +55,7 @@ public class TransitCommand extends CommandBase {
 
             case RETRACTING_GATE:
                 if (stateTimer.milliseconds() >= TransitConstants.gateRetractDelayMs) {
-                    // Step 2 starts only after the blocking rod has had time to clear.
-                    transit.setRampState(Transit.RampState.UP);
-                    stateTimer.reset();
-                    feedState = FeedState.RAISING_RAMP;
-                }
-                break;
-
-            case RAISING_RAMP:
-                if (stateTimer.milliseconds() >= TransitConstants.rampRaiseDelayMs) {
-                    // Step 3: now it is safe for the shared motor to feed a ball.
+                    // The rod has cleared; it is now safe for the shared motor to feed a ball.
                     intake.setIntakeState(Intake.IntakeState.FEED);
                     feedState = FeedState.FEEDING;
                 }
@@ -86,7 +75,6 @@ public class TransitCommand extends CommandBase {
     private void moveToSafeState() {
         intake.stop();
         transit.setGateState(Transit.GateState.CLOSED);
-        transit.setRampState(Transit.RampState.DOWN);
         feedState = FeedState.SAFE;
     }
 }
