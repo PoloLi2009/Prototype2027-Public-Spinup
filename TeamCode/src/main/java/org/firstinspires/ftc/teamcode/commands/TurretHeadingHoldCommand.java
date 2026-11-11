@@ -1,6 +1,8 @@
 package org.firstinspires.ftc.teamcode.commands;
 
+import java.util.Objects;
 import com.arcrobotics.ftclib.command.CommandBase;
+import java.util.function.BooleanSupplier;
 import com.qualcomm.robotcore.hardware.Gamepad;
 import org.firstinspires.ftc.teamcode.subsystems.localization.Pinpoint;
 import org.firstinspires.ftc.teamcode.subsystems.turret.Turret;
@@ -11,7 +13,7 @@ import org.firstinspires.ftc.teamcode.utils.TurretMath;
 public class TurretHeadingHoldCommand extends CommandBase {
     private final Turret turret;
     private final Pinpoint pinpoint;
-    private final Gamepad gamepad;
+    private final BooleanSupplier captureForwardRequested;
     private boolean holdInitialized;
     private boolean lastRightStickButton;
     private double holdWorldDegrees;
@@ -19,9 +21,14 @@ public class TurretHeadingHoldCommand extends CommandBase {
     private boolean tracking;
 
     public TurretHeadingHoldCommand(Turret turret, Pinpoint pinpoint, Gamepad gamepad) {
+        this(turret, pinpoint, () -> gamepad.right_stick_button);
+    }
+
+    /** Live control inputs; axes retain the original command signs and deadbands. */
+    public TurretHeadingHoldCommand(Turret turret, Pinpoint pinpoint, BooleanSupplier captureForwardRequested) {
         this.turret = turret;
         this.pinpoint = pinpoint;
-        this.gamepad = gamepad;
+        this.captureForwardRequested = Objects.requireNonNull(captureForwardRequested);
         addRequirements(turret);
     }
 
@@ -46,11 +53,11 @@ public class TurretHeadingHoldCommand extends CommandBase {
             holdWorldDegrees = turret.getAngleDegrees() - headingDegrees;
             holdInitialized = true;
         }
-        if (gamepad.right_stick_button && !lastRightStickButton) {
+        if (captureForwardRequested.getAsBoolean() && !lastRightStickButton) {
             // At the press, request 0 degrees relative to the current chassis heading.
             holdWorldDegrees = -headingDegrees;
         }
-        lastRightStickButton = gamepad.right_stick_button;
+        lastRightStickButton = captureForwardRequested.getAsBoolean();
 
         targetDegrees = TurretMath.reachableDegrees(holdWorldDegrees + headingDegrees,
                 turret.getAngleDegrees(), TurretConstants.minDegrees(),

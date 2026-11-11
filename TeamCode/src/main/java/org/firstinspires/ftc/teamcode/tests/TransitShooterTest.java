@@ -38,7 +38,7 @@ public class TransitShooterTest extends CommandOpMode {
         telemetry.addData("Transit", intake.getIntakeState());
         telemetry.addData("Gate", transit.getGateState());
         telemetry.addData("Shooter target RPM", "%.0f", command.getTargetRpm());
-        telemetry.addData("Shooter left encoder RPM", "%.0f", shooter.getLeftFlywheelRpm());
+        telemetry.addData("Shooter right encoder RPM", "%.0f", shooter.getRightFlywheelRpm());
         telemetry.addData("Shooter at target", shooter.isAtTargetRpm());
         telemetry.update();
     }

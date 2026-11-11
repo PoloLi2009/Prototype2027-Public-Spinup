@@ -1,6 +1,9 @@
 package org.firstinspires.ftc.teamcode.commands;
 
+import java.util.Objects;
 import com.arcrobotics.ftclib.command.CommandBase;
+import java.util.function.DoubleSupplier;
+import java.util.function.BooleanSupplier;
 import com.arcrobotics.ftclib.geometry.Pose2d;
 import com.arcrobotics.ftclib.geometry.Rotation2d;
 import com.arcrobotics.ftclib.geometry.Transform2d;
@@ -29,7 +32,12 @@ public class VisionCellChassisAimCommand extends CommandBase {
     private final VisionLocalization localization;
     private final LimelightVision vision;
     private final TurretStartupHoldCommand turretHold;
-    private final Gamepad gamepad;
+    private final DoubleSupplier forwardAxis;
+    private final DoubleSupplier strafeAxis;
+    private final DoubleSupplier turnAxis;
+    private final BooleanSupplier resetOriginRequested;
+    private final DoubleSupplier shootRequest;
+    private final BooleanSupplier reverseRequested;
     private final Pose2d startFieldPose = new Pose2d(
             PinpointConstants.testStartFieldXmm / 1000.0,
             PinpointConstants.testStartFieldYmm / 1000.0,
@@ -50,18 +58,35 @@ public class VisionCellChassisAimCommand extends CommandBase {
     public VisionCellChassisAimCommand(Drive drive, Pinpoint pinpoint,
                                        VisionLocalization localization, LimelightVision vision,
                                        TurretStartupHoldCommand turretHold, Gamepad gamepad) {
+        this(drive, pinpoint, localization, vision, turretHold, () -> gamepad.left_stick_y,
+                () -> gamepad.left_stick_x, () -> gamepad.right_stick_x, () -> gamepad.left_stick_button,
+                () -> gamepad.right_trigger, () -> gamepad.left_bumper);
+    }
+
+    /** Live control inputs; axes retain the original command signs and deadbands. */
+    public VisionCellChassisAimCommand(Drive drive, Pinpoint pinpoint,
+                                       VisionLocalization localization, LimelightVision vision,
+                                       TurretStartupHoldCommand turretHold, DoubleSupplier forwardAxis,
+                                               DoubleSupplier strafeAxis, DoubleSupplier turnAxis,
+                                               BooleanSupplier resetOriginRequested, DoubleSupplier shootRequest,
+                                               BooleanSupplier reverseRequested) {
         this.drive = drive;
         this.pinpoint = pinpoint;
         this.localization = localization;
         this.vision = vision;
         this.turretHold = turretHold;
-        this.gamepad = gamepad;
+        this.forwardAxis = Objects.requireNonNull(forwardAxis);
+        this.strafeAxis = Objects.requireNonNull(strafeAxis);
+        this.turnAxis = Objects.requireNonNull(turnAxis);
+        this.resetOriginRequested = Objects.requireNonNull(resetOriginRequested);
+        this.shootRequest = Objects.requireNonNull(shootRequest);
+        this.reverseRequested = Objects.requireNonNull(reverseRequested);
         addRequirements(drive);
     }
 
     @Override
     public void execute() {
-        boolean originButton = gamepad.left_stick_button;
+        boolean originButton = resetOriginRequested.getAsBoolean();
         boolean resetOrigin = originButton && !lastOriginButton;
         lastOriginButton = originButton;
         double odHeading = pinpoint.getHeadingDegrees();
@@ -78,26 +103,51 @@ public class VisionCellChassisAimCommand extends CommandBase {
 
         double odXmm = pinpoint.getXmm();
         double odYmm = pinpoint.getYmm();
-        if (resetOrigin && Double.isFinite(odXmm) && Double.isFinite(odYmm)) {
-            originXmm = odXmm;
-            originYmm = odYmm;
-        }
+        if (resetOrigin) resetDriverOrigin();
         // Driver coordinates can be re-zeroed independently of field localization.
         driverXmm = odXmm - originXmm;
         driverYmm = odYmm - originYmm;
 
-        updateTarget(odXmm, odYmm, odHeading);
         // Pushing the right stick right requests a clockwise turn.
-        turnPower = -CCW_TURN_SIGN * deadband(gamepad.right_stick_x);
+        double manualTurn = -CCW_TURN_SIGN * deadband(turnAxis.getAsDouble());
+        updateTurn(shootRequest.getAsDouble() >= 0.5 && !reverseRequested.getAsBoolean(), manualTurn, true);
+        drive.moveFieldCentric(-deadband(forwardAxis.getAsDouble()),
+                deadband(strafeAxis.getAsDouble()), turnPower, odHeading);
+    }
+
+    /** Re-zero displayed driver coordinates without changing the field-drive heading. */
+    public void resetDriverOrigin() {
+        double x = pinpoint.getXmm();
+        double y = pinpoint.getYmm();
+        if (pinpoint.isReady() && Double.isFinite(x) && Double.isFinite(y)) {
+            originXmm = x;
+            originYmm = y;
+        }
+    }
+
+    /** Compute turn power without writing the drivetrain. Positive power turns CCW. */
+    public double updateTurn(boolean aimRequested, double manualTurnPower, boolean allowOdOnlyPose) {
+        double odHeading = pinpoint.getHeadingDegrees();
+        if (pinpoint.isReady() && Double.isFinite(odHeading)) {
+            updateTarget(pinpoint.getXmm(), pinpoint.getYmm(), odHeading, allowOdOnlyPose);
+        } else {
+            clearTarget();
+            aimPose = null;
+        }
+        turnPower = manualTurnPower;
         aimStatus = "Manual";
-        if (gamepad.right_trigger < 0.5 || gamepad.left_bumper || turnPower != 0.0) {
+        if (!aimRequested) {
             settled = false;
+        } else if (turnPower != 0.0) {
+            settled = false;
+            aimStatus = "Manual turn";
         } else if (!turretHold.isOnTarget()) {
             settled = false;
             aimStatus = "Waiting for turret hold";
         } else if (!Double.isFinite(headingErrorDegrees)) {
             settled = false;
-            aimStatus = "Waiting for valid CELL bearing";
+            aimStatus = !allowOdOnlyPose && !localization.hasFieldPose()
+                    ? "Waiting for vision field pose" : "Waiting for valid CELL bearing";
         } else {
             settled = Math.abs(headingErrorDegrees) <= AIM_TOLERANCE_DEGREES;
             if (!settled) {
@@ -109,14 +159,14 @@ public class VisionCellChassisAimCommand extends CommandBase {
             aimStatus = settled ? "On target" : "Turning";
         }
 
-        drive.moveFieldCentric(-deadband(gamepad.left_stick_y),
-                deadband(gamepad.left_stick_x), turnPower, odHeading);
+        return turnPower;
     }
 
-    private void updateTarget(double odXmm, double odYmm, double odHeading) {
+    private void updateTarget(double odXmm, double odYmm, double odHeading, boolean allowOdOnlyPose) {
         clearTarget();
         aimPose = null;
         if (!Double.isFinite(odXmm) || !Double.isFinite(odYmm)) return;
+        if (!allowOdOnlyPose && !localization.hasFieldPose()) return;
 
         // The estimator propagates the last camera correction with Pinpoint on every loop.
         Pose2d fieldPose = localization.hasFieldPose() ? localization.getEstimatedPosition()
@@ -160,7 +210,7 @@ public class VisionCellChassisAimCommand extends CommandBase {
     public String getAimStatus() { return aimStatus; }
     public boolean isOnTarget() {
         return settled && pinpoint.isReady() && turretHold.isOnTarget()
-                && deadband(gamepad.right_stick_x) == 0.0;
+                && deadband(turnAxis.getAsDouble()) == 0.0;
     }
 
     @Override

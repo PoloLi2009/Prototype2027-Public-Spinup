@@ -59,7 +59,7 @@ public class DriveTurretHeadingHoldTest extends CommandOpMode {
         } finally {
             CommandScheduler.getInstance().reset();
             if (drive != null) drive.stop();
-            if (turret != null) turret.stop();
+            if (turret != null) turret.shutdown();
         }
     }
 }

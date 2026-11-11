@@ -1,6 +1,8 @@
 package org.firstinspires.ftc.teamcode.commands;
 
+import java.util.Objects;
 import com.arcrobotics.ftclib.command.CommandBase;
+import java.util.function.BooleanSupplier;
 import com.arcrobotics.ftclib.geometry.Pose2d;
 import com.arcrobotics.ftclib.geometry.Rotation2d;
 import com.qualcomm.robotcore.hardware.Gamepad;
@@ -16,8 +18,7 @@ public class VisionReadCommand extends CommandBase {
     private final Pinpoint pinpoint;
     private final DoubleSupplier turretAngleDegrees;
     private final VisionLocalization localization;
-    private final Gamepad gamepad;
-    private final boolean toggleWithX;
+    private final BooleanSupplier toggleAllianceRequested;
     private boolean lastAllianceButton;
     public VisionReadCommand(LimelightVision vision, Pinpoint pinpoint, Turret turret,
                              VisionLocalization localization, Gamepad gamepad) {
@@ -30,21 +31,34 @@ public class VisionReadCommand extends CommandBase {
     public VisionReadCommand(LimelightVision vision, Pinpoint pinpoint,
                              VisionLocalization localization, Gamepad gamepad,
                              boolean toggleWithX, DoubleSupplier turretAngleDegrees) {
+        this(vision, pinpoint, localization, () -> toggleWithX ? gamepad.x : gamepad.y, turretAngleDegrees);
+    }
+
+    public VisionReadCommand(LimelightVision vision, Pinpoint pinpoint,
+                             VisionLocalization localization, BooleanSupplier toggleAllianceRequested,
+                             DoubleSupplier turretAngleDegrees) {
         this.vision=vision; this.pinpoint=pinpoint; this.turretAngleDegrees=turretAngleDegrees;
-        this.localization=localization; this.gamepad=gamepad;
-        this.toggleWithX=toggleWithX;
+        this.localization=localization; this.toggleAllianceRequested=Objects.requireNonNull(toggleAllianceRequested);
         addRequirements(vision,localization);
     }
     @Override public void initialize() {
-        lastAllianceButton = toggleWithX ? gamepad.x : gamepad.y;
+        lastAllianceButton = toggleAllianceRequested.getAsBoolean();
     }
     @Override public void execute() {
-        boolean toggle = toggleWithX ? gamepad.x : gamepad.y;
+        selectAlliance();
+        updateLocalization();
+    }
+
+    public void selectAlliance() {
+        boolean toggle = toggleAllianceRequested.getAsBoolean();
         if (toggle && !lastAllianceButton) {
             vision.toggleAlliance();
             // Both pipelines share a field frame. Keep predicting from the last correction.
         }
         lastAllianceButton = toggle;
+    }
+
+    public void updateLocalization() {
         if(!pinpoint.isReady()) {localization.clear(); return;}
         localization.update(System.nanoTime()/1e9,
                 new Pose2d(pinpoint.getXmm()/1000.0,pinpoint.getYmm()/1000.0,

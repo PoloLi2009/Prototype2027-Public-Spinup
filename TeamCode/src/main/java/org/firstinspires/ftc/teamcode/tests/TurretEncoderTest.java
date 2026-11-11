@@ -33,7 +33,7 @@ public class TurretEncoderTest extends CommandOpMode {
         try { super.runOpMode(); }
         finally {
             CommandScheduler.getInstance().reset();
-            if (turret != null) turret.stop();
+            if (turret != null) turret.shutdown();
         }
     }
 }

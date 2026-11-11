@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.commands;
 
+import java.util.Objects;
 import com.arcrobotics.ftclib.command.CommandBase;
 
 import org.firstinspires.ftc.teamcode.subsystems.intake.Intake;
@@ -9,8 +10,14 @@ import org.firstinspires.ftc.teamcode.subsystems.transit.Transit;
 public class ReverseIntakeCommand extends CommandBase {
     private final Intake intake;
     private final Transit transit;
+    private final RunIntakeCommand motor;
 
     public ReverseIntakeCommand(Intake intake, Transit transit) {
+        this(intake, transit, Intake.IntakeState.REVERSED);
+    }
+
+    public ReverseIntakeCommand(Intake intake, Transit transit, Intake.IntakeState state) {
+        motor = new RunIntakeCommand(intake, Objects.requireNonNull(state));
         this.intake = intake;
         this.transit = transit;
         addRequirements(intake, transit);
@@ -23,7 +30,7 @@ public class ReverseIntakeCommand extends CommandBase {
 
     @Override
     public void execute() {
-        intake.setIntakeState(Intake.IntakeState.REVERSED);
+        motor.execute();
     }
 
     @Override

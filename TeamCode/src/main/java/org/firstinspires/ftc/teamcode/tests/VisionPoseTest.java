@@ -60,7 +60,7 @@ public class VisionPoseTest extends CommandOpMode {
         finally {
             CommandScheduler.getInstance().reset();
             if(vision!=null)vision.stop();
-            if(turret!=null)turret.stop();
+            if(turret!=null)turret.shutdown();
         }
     }
 }

@@ -1,6 +1,9 @@
 package org.firstinspires.ftc.teamcode.commands;
 
+import java.util.Objects;
 import com.arcrobotics.ftclib.command.CommandBase;
+import java.util.function.DoubleSupplier;
+import java.util.function.BooleanSupplier;
 import com.qualcomm.robotcore.hardware.Gamepad;
 import org.firstinspires.ftc.teamcode.subsystems.drive.Drive;
 import org.firstinspires.ftc.teamcode.subsystems.drive.DriveConstants;
@@ -10,7 +13,10 @@ import org.firstinspires.ftc.teamcode.subsystems.localization.Pinpoint;
 public class FieldCentricDriveCommand extends CommandBase {
     private final Drive drive;
     private final Pinpoint pinpoint;
-    private final Gamepad gamepad;
+    private final DoubleSupplier forwardAxis;
+    private final DoubleSupplier strafeAxis;
+    private final DoubleSupplier turnAxis;
+    private final BooleanSupplier resetHeadingRequested;
     private final boolean requireFieldPose;
     private boolean headingZeroInitialized;
     private boolean lastLeftStickButton;
@@ -23,9 +29,20 @@ public class FieldCentricDriveCommand extends CommandBase {
 
     public FieldCentricDriveCommand(Drive drive, Pinpoint pinpoint, Gamepad gamepad,
                                     boolean requireFieldPose) {
+        this(drive, pinpoint, () -> gamepad.left_stick_y, () -> gamepad.left_stick_x,
+                () -> gamepad.right_stick_x, () -> gamepad.left_stick_button, requireFieldPose);
+    }
+
+    /** Live control inputs; axes retain the original command signs and deadbands. */
+    public FieldCentricDriveCommand(Drive drive, Pinpoint pinpoint, DoubleSupplier forwardAxis,
+            DoubleSupplier strafeAxis, DoubleSupplier turnAxis, BooleanSupplier resetHeadingRequested,
+                                    boolean requireFieldPose) {
         this.drive = drive;
         this.pinpoint = pinpoint;
-        this.gamepad = gamepad;
+        this.forwardAxis = Objects.requireNonNull(forwardAxis);
+        this.strafeAxis = Objects.requireNonNull(strafeAxis);
+        this.turnAxis = Objects.requireNonNull(turnAxis);
+        this.resetHeadingRequested = Objects.requireNonNull(resetHeadingRequested);
         this.requireFieldPose = requireFieldPose;
         addRequirements(drive);
     }
@@ -43,17 +60,17 @@ public class FieldCentricDriveCommand extends CommandBase {
         }
         if (!headingZeroInitialized) {
             driverHeadingZeroDegrees = headingDegrees;
-            lastLeftStickButton = gamepad.left_stick_button;
+            lastLeftStickButton = resetHeadingRequested.getAsBoolean();
             headingZeroInitialized = true;
         }
-        if (gamepad.left_stick_button && !lastLeftStickButton) {
+        if (resetHeadingRequested.getAsBoolean() && !lastLeftStickButton) {
             driverHeadingZeroDegrees = headingDegrees;
         }
-        lastLeftStickButton = gamepad.left_stick_button;
+        lastLeftStickButton = resetHeadingRequested.getAsBoolean();
         driverHeadingDegrees = headingDegrees - driverHeadingZeroDegrees;
 
-        drive.moveFieldCentric(-deadband(gamepad.left_stick_y),
-                deadband(gamepad.left_stick_x), -deadband(gamepad.right_stick_x),
+        drive.moveFieldCentric(-deadband(forwardAxis.getAsDouble()),
+                deadband(strafeAxis.getAsDouble()), -deadband(turnAxis.getAsDouble()),
                 driverHeadingDegrees);
     }
 

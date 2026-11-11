@@ -57,4 +57,9 @@ public class Pinpoint extends SubsystemBase {
     public double getHeadingDegrees() {
         return pinpoint.getPosition().getHeading(AngleUnit.DEGREES);
     }
+
+    /** Translation speed from the last update(); used by the ported ShootAssist position hold. */
+    public double getTranslationSpeedMmPerSecond() {
+        return Math.hypot(pinpoint.getVelX(DistanceUnit.MM), pinpoint.getVelY(DistanceUnit.MM));
+    }
 }

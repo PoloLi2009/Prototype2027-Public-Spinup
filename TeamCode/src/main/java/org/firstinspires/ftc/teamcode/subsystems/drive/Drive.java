@@ -2,10 +2,9 @@ package org.firstinspires.ftc.teamcode.subsystems.drive;
 
 import com.arcrobotics.ftclib.command.SubsystemBase;
 import com.qualcomm.robotcore.hardware.DcMotor;
-import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
-/** Four-motor mecanum drive subsystem. It is intentionally robot-centric for spinup. */
+/** Four-motor hardware owner. Solo uses the Overtune Blue manual-drive command. */
 public class Drive extends SubsystemBase {
     public final DcMotor leftFrontMotor;
     public final DcMotor leftBackMotor;
@@ -26,8 +25,10 @@ public class Drive extends SubsystemBase {
         rightBackMotor = hardwareMap.get(DcMotor.class, DriveConstants.rightBackMotorName);
 
         // Change directions here after the first safe wheel-on-blocks test.
-        leftFrontMotor.setDirection(DcMotorSimple.Direction.REVERSE);
-        leftBackMotor.setDirection(DcMotorSimple.Direction.REVERSE);
+        leftFrontMotor.setDirection(DriveConstants.leftFrontMotorDirection);
+        leftBackMotor.setDirection(DriveConstants.leftBackMotorDirection);
+        rightFrontMotor.setDirection(DriveConstants.rightFrontMotorDirection);
+        rightBackMotor.setDirection(DriveConstants.rightBackMotorDirection);
 
         setBrakeMode(true);
         stop();
@@ -39,14 +40,10 @@ public class Drive extends SubsystemBase {
         double denominator = Math.max(Math.abs(forward) + Math.abs(correctedStrafe)
                 + Math.abs(turn), 1.0);
 
-        leftFrontMotor.setPower((forward + correctedStrafe + turn) / denominator
-                * DriveConstants.teleOpScale);
-        leftBackMotor.setPower((forward - correctedStrafe + turn) / denominator
-                * DriveConstants.teleOpScale);
-        rightFrontMotor.setPower((forward - correctedStrafe - turn) / denominator
-                * DriveConstants.teleOpScale);
-        rightBackMotor.setPower((forward + correctedStrafe - turn) / denominator
-                * DriveConstants.teleOpScale);
+        setWheelPowers((forward + correctedStrafe + turn) / denominator,
+                (forward - correctedStrafe + turn) / denominator,
+                (forward - correctedStrafe - turn) / denominator,
+                (forward + correctedStrafe - turn) / denominator);
     }
 
     /** Field forward/right commands, using the tested motor signs of this chassis. */
@@ -62,6 +59,14 @@ public class Drive extends SubsystemBase {
         double robotForward = fieldForward * cos - fieldRight * sin;
         double robotRight = fieldForward * sin + fieldRight * cos;
         moveRobot(-robotForward, robotRight, turn);
+    }
+
+    /** Apply normalized wheel requests without adding another coordinate transform. */
+    public void setWheelPowers(double leftFront, double leftBack, double rightFront, double rightBack) {
+        leftFrontMotor.setPower(leftFront * DriveConstants.teleOpScale);
+        leftBackMotor.setPower(leftBack * DriveConstants.teleOpScale);
+        rightFrontMotor.setPower(rightFront * DriveConstants.teleOpScale);
+        rightBackMotor.setPower(rightBack * DriveConstants.teleOpScale);
     }
 
     public void stop() {

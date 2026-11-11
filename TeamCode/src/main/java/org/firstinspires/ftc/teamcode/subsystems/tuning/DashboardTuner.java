@@ -10,6 +10,7 @@ import com.arcrobotics.ftclib.command.SubsystemBase;
 import com.qualcomm.robotcore.hardware.ColorSensor;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.PIDFCoefficients;
@@ -17,7 +18,11 @@ import com.qualcomm.robotcore.hardware.Servo;
 
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 
-import java.util.Locale;
+import java.util.Arrays;
+import org.firstinspires.ftc.teamcode.subsystems.drive.DriveConstants;
+import org.firstinspires.ftc.teamcode.subsystems.shooter.ShooterConstants;
+import org.firstinspires.ftc.teamcode.subsystems.turret.Turret;
+import org.firstinspires.ftc.teamcode.subsystems.turret.TurretConstants;
 
 /** Generic four-channel Dashboard tuning hardware, isolated from competition subsystems. */
 @Config
@@ -26,8 +31,9 @@ public class DashboardTuner extends SubsystemBase {
     public static String[] motorName = {"", "", "", ""};
     public static String[] servoName = {"", "", "", ""};
     public static double[] motorTarget = new double[4];
-    public static double[] servoTarget = new double[4];
+    public static double[] servoTarget = {-1, -1, -1, -1};
     public static int[] slaveTo = {-1, -1, -1, -1};
+    public static double[] slavePowerScale = {1, 1, 1, 1};
     public static boolean[] isPositionCloseLoop = new boolean[4];
     public static boolean[] isVelocityCloseLoop = new boolean[4];
 
@@ -39,9 +45,6 @@ public class DashboardTuner extends SubsystemBase {
     public static String[] colorSensorName = {"", "", "", ""};
 
     private final DcMotorEx[] motors = new DcMotorEx[4];
-    private final Servo[] servos = new Servo[4];
-    private final ColorSensor[] colorSensors = new ColorSensor[4];
-    private final DistanceSensor[] distanceSensors = new DistanceSensor[4];
     private final PIDFController[] pidfControllers = {
             new PIDFController(0, 0, 0, 0),
             new PIDFController(0, 0, 0, 0),
@@ -49,110 +52,193 @@ public class DashboardTuner extends SubsystemBase {
             new PIDFController(0, 0, 0, 0)
     };
 
-    private final float[] hsvValues = {0F, 0F, 0F};
-    private FtcDashboard dashboard;
+    private final String[] boundMotorNames = new String[4];
+    private final int[] previousMode = new int[4];
+    private final double[] output = new double[4];
+    private final float[] hsvValues = new float[3];
+    private final FtcDashboard dashboard;
+    private Turret lockedTurret;
 
     public DashboardTuner(HardwareMap hardwareMap) {
         this.hardwareMap = hardwareMap;
-        init();
-    }
-
-    private void init() {
         dashboard = FtcDashboard.getInstance();
-
-        for (int i = 0; i < 4; i++) {
-            if (!motorName[i].isEmpty()) {
-                motors[i] = hardwareMap.get(DcMotorEx.class, motorName[i]);
-                if (isVelocityCloseLoop[i]) {
-                    motors[i].setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER,
-                            new PIDFCoefficients(kP[i], kI[i], kD[i], kF[i]));
-                }
-                if (isPositionCloseLoop[i]) {
-                    pidfControllers[i].setPIDF(kP[i], kI[i], kD[i], kF[i]);
-                }
-            }
-            if (!servoName[i].isEmpty()) {
-                servos[i] = hardwareMap.get(Servo.class, servoName[i]);
-            }
-            if (!colorSensorName[i].isEmpty()) {
-                colorSensors[i] = hardwareMap.get(ColorSensor.class, colorSensorName[i]);
-                distanceSensors[i] = hardwareMap.get(DistanceSensor.class, colorSensorName[i]);
-            }
-        }
     }
 
     public void applyTargets() {
-        for (int i = 0; i < 4; i++) {
-            tuneMotor(i);
-            tuneServo(i);
-            reportSensor(i);
+        TelemetryPacket packet = new TelemetryPacket();
+        if (!Arrays.equals(boundMotorNames, motorName)) bindMotors();
+        if (lockedTurret != null) lockedTurret.periodic();
+
+        // Compute leaders first. A follower never runs its own encoder loop.
+        Arrays.fill(output, 0.0);
+        for (int i = 0; i < motors.length; i++) {
+            if (isTunable(i) && slaveTo[i] == -1) tuneMotor(i, packet);
         }
+        for (int i = 0; i < motors.length; i++) {
+            if (isTunable(i) && slaveTo[i] != -1) followPower(i, packet);
+            tuneServo(i, packet);
+            reportSensor(i, packet);
+        }
+        if (dashboard != null) dashboard.sendTelemetryPacket(packet);
     }
 
-    private void tuneMotor(int index) {
-        if (motors[index] == null) {
-            return;
-        }
-
-        int leader = slaveTo[index];
-        if (leader >= 0 && leader < motors.length) {
-            if (motors[leader] != null && isVelocityCloseLoop[leader]
-                    && !isPositionCloseLoop[leader]) {
-                motors[index].setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER,
-                        new PIDFCoefficients(kP[leader], kI[leader], kD[leader], kF[leader]));
-                motors[index].setVelocity(-motorTarget[leader]);
+    private void bindMotors() {
+        stopMotors();
+        Arrays.fill(motors, null);
+        Arrays.fill(previousMode, -1);
+        System.arraycopy(motorName, 0, boundMotorNames, 0, motors.length);
+        for (int i = 0; i < motors.length; i++) {
+            String name = motorName[i];
+            if (name.isEmpty()) continue;
+            if (TurretConstants.LOCK_STARTUP_ANGLE && name.equals(TurretConstants.turretMotorName)) {
+                if (lockedTurret == null && hardwareMap.tryGet(DcMotorEx.class, name) != null) {
+                    lockedTurret = new Turret(hardwareMap);
+                }
+                continue;
             }
+            DcMotorEx motor = hardwareMap.tryGet(DcMotorEx.class, name);
+            if (motor == null || Arrays.asList(motors).contains(motor)) continue;
+            motors[i] = motor;
+            motor.setPower(0.0);
+            boolean reversed = name.equals(DriveConstants.leftFrontMotorName)
+                    || name.equals(DriveConstants.leftBackMotorName)
+                    || name.equals(ShooterConstants.leftShooterName)
+                    || name.equals(ShooterConstants.rightShooterName);
+            motor.setDirection(reversed ? DcMotorSimple.Direction.REVERSE : DcMotorSimple.Direction.FORWARD);
+        }
+    }
+
+    private boolean isTunable(int index) {
+        return index >= 0 && index < motors.length && motors[index] != null;
+    }
+
+    private boolean hasFollower(int index) {
+        for (int i = 0; i < motors.length; i++) {
+            if (i != index && isTunable(i) && slaveTo[i] == index) return true;
+        }
+        return false;
+    }
+
+    private void tuneMotor(int i, TelemetryPacket packet) {
+        DcMotorEx motor = motors[i];
+        boolean position = isPositionCloseLoop[i];
+        boolean velocity = isVelocityCloseLoop[i];
+        double target = motorTarget[i];
+        if (!Double.isFinite(target) || (position && velocity)
+                || ((position || velocity) && (!validGains(i)
+                || boundMotorNames[i].equals(ShooterConstants.leftShooterName)))) {
+            applyPower(i, 0, 0.0);
+            packet.put("motorStatus " + i, "Check target, mode, PIDF or encoder");
             return;
         }
 
-        TelemetryPacket packet = new TelemetryPacket();
-        if (isVelocityCloseLoop[index] && !isPositionCloseLoop[index]) {
-            motors[index].setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER,
-                    new PIDFCoefficients(kP[index], kI[index], kD[index], kF[index]));
-            motors[index].setVelocity(motorTarget[index]);
-            packet.put("targetVelocity " + index, motorTarget[index]);
-            packet.put("currentVelocity " + index, motors[index].getVelocity());
-        } else if (isPositionCloseLoop[index] && !isVelocityCloseLoop[index]) {
-            pidfControllers[index].setPIDF(kP[index], kI[index], kD[index], kF[index]);
-            double position = motors[index].getCurrentPosition();
-            motors[index].setPower(pidfControllers[index].calculate(position, motorTarget[index]));
-            packet.put("targetPosition " + index, motorTarget[index]);
-            packet.put("currentPosition " + index, position);
+        double currentVelocity = motor.getVelocity();
+        int currentPosition = motor.getCurrentPosition();
+        if (velocity && !hasFollower(i) && target != 0.0) {
+            selectMode(i, 3, DcMotor.RunMode.RUN_USING_ENCODER);
+            motor.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER,
+                    new PIDFCoefficients(kP[i], kI[i], kD[i], kF[i]));
+            motor.setVelocity(target);
+        } else if (position || (velocity && target != 0.0)) {
+            int mode = position ? 1 : 2;
+            selectMode(i, mode, DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+            PIDFController controller = pidfControllers[i];
+            controller.setPIDF(kP[i], kI[i], kD[i], kF[i]);
+            double measured = position ? currentPosition : currentVelocity;
+            output[i] = Double.isFinite(measured) ? clipPower(controller.calculate(measured, target)) : 0.0;
+            motor.setPower(output[i]);
         } else {
-            motors[index].setPower(motorTarget[index]);
-            packet.put("currentVelocity " + index, motors[index].getVelocity());
-            packet.put("currentPosition " + index, motors[index].getCurrentPosition());
+            applyPower(i, 0, target);
         }
-        packet.put("currentPower " + index, motors[index].getPower());
-        dashboard.sendTelemetryPacket(packet);
+
+        if (velocity) packet.put("targetVelocity " + i, target);
+        if (position) packet.put("targetPosition " + i, target);
+        packet.put("currentVelocity " + i, currentVelocity);
+        packet.put("currentPosition " + i, currentPosition);
+        packet.put("currentPower " + i, motor.getPower());
     }
 
-    private void tuneServo(int index) {
-        if (servos[index] != null) {
-            servos[index].setPosition(servoTarget[index]);
-        }
+    private boolean validGains(int i) {
+        return Double.isFinite(kP[i]) && Double.isFinite(kI[i])
+                && Double.isFinite(kD[i]) && Double.isFinite(kF[i]);
     }
 
-    private void reportSensor(int index) {
-        if (colorSensors[index] == null) {
+    private void followPower(int i, TelemetryPacket packet) {
+        int leader = slaveTo[i];
+        boolean valid = isTunable(leader) && leader != i && slaveTo[leader] == -1;
+        applyPower(i, 4, valid ? output[leader] * slavePowerScale[i] : 0.0);
+        packet.put("currentPower " + i, output[i]);
+        if (!valid) packet.put("motorStatus " + i, "Invalid leader");
+    }
+
+    private void applyPower(int i, int mode, double power) {
+        selectMode(i, mode, DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        output[i] = clipPower(power);
+        motors[i].setPower(output[i]);
+    }
+
+    private void selectMode(int i, int mode, DcMotor.RunMode runMode) {
+        DcMotorEx motor = motors[i];
+        if (previousMode[i] != mode) {
+            motor.setPower(0.0);
+            pidfControllers[i].reset();
+            previousMode[i] = mode;
+        }
+        if (motor.getMode() != runMode) motor.setMode(runMode);
+    }
+
+    private static double clipPower(double power) {
+        return Double.isFinite(power) ? Math.max(-1.0, Math.min(1.0, power)) : 0.0;
+    }
+
+    private void tuneServo(int i, TelemetryPacket packet) {
+        if (motorName[i].equals(TurretConstants.turretMotorName) && TurretConstants.LOCK_STARTUP_ANGLE) {
+            packet.put("motorStatus " + i, lockedTurret == null ? "Missing turret" : "Turret locked");
+            if (lockedTurret != null) packet.put("turretAngle " + i, lockedTurret.getAngleDegrees());
+        } else if (!motorName[i].isEmpty() && motors[i] == null) {
+            packet.put("motorStatus " + i, "Missing or duplicate motor");
+        }
+        String name = servoName[i];
+        if (name.isEmpty()) return;
+        Servo servo = hardwareMap.tryGet(Servo.class, name);
+        if (servo == null) {
+            packet.put("servoStatus " + i, "Missing servo");
             return;
         }
-
-        Color.RGBToHSV((int) (colorSensors[index].red() * 255),
-                (int) (colorSensors[index].green() * 255),
-                (int) (colorSensors[index].blue() * 255), hsvValues);
-
-        TelemetryPacket packet = new TelemetryPacket();
-        packet.put("Alpha " + index, colorSensors[index].alpha());
-        packet.put("Red " + index, colorSensors[index].red());
-        packet.put("Green " + index, colorSensors[index].green());
-        packet.put("Blue " + index, colorSensors[index].blue());
-        packet.put("Hue " + index, hsvValues[0]);
-        packet.put("Distance (cm) " + index, String.format(Locale.US, "%.02f",
-                distanceSensors[index].getDistance(DistanceUnit.CM)));
-        dashboard.sendTelemetryPacket(packet);
+        double target = servoTarget[i];
+        if (Double.isFinite(target) && target >= 0.0 && target <= 1.0) {
+            servo.setDirection(name.equals(ShooterConstants.rightPitchServoName)
+                    ? Servo.Direction.REVERSE : Servo.Direction.FORWARD);
+            servo.setPosition(target);
+            packet.put("servoPosition " + i, target);
+        }
     }
+
+    private void reportSensor(int i, TelemetryPacket packet) {
+        String name = colorSensorName[i];
+        if (name.isEmpty()) return;
+        ColorSensor sensor = hardwareMap.tryGet(ColorSensor.class, name);
+        if (sensor != null) {
+            Color.RGBToHSV(sensor.red(), sensor.green(), sensor.blue(), hsvValues);
+            packet.put("Alpha " + i, sensor.alpha());
+            packet.put("Red " + i, sensor.red());
+            packet.put("Green " + i, sensor.green());
+            packet.put("Blue " + i, sensor.blue());
+            packet.put("Hue " + i, hsvValues[0]);
+        }
+        DistanceSensor distance = hardwareMap.tryGet(DistanceSensor.class, name);
+        if (distance != null) packet.put("Distance (cm) " + i, distance.getDistance(DistanceUnit.CM));
+    }
+
     public void stop() {
+        if (lockedTurret != null) {
+            lockedTurret.shutdown();
+            lockedTurret = null;
+        }
+        stopMotors();
+    }
+
+    private void stopMotors() {
         for (DcMotorEx motor : motors) if (motor != null) motor.setPower(0.0);
     }
 }

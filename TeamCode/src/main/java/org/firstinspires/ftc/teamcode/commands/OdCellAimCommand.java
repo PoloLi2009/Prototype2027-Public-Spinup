@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.commands;
 
+import java.util.Objects;
 import com.arcrobotics.ftclib.command.CommandBase;
 import com.qualcomm.robotcore.hardware.Gamepad;
 import org.firstinspires.ftc.teamcode.subsystems.field.CellTarget;
@@ -13,11 +14,10 @@ import java.util.function.BooleanSupplier;
 public class OdCellAimCommand extends CommandBase {
     private final Turret turret;
     private final Pinpoint pinpoint;
-    private final Gamepad gamepad;
+    private final BooleanSupplier toggleAllianceRequested;
     private final double startXmm;
     private final double startYmm;
     private final double startHeadingDegrees;
-    private final boolean toggleWithY;
     private final BooleanSupplier aimEnabled;
     private boolean blueAlliance = true;
     private boolean lastToggle;
@@ -34,25 +34,31 @@ public class OdCellAimCommand extends CommandBase {
     public OdCellAimCommand(Turret turret, Pinpoint pinpoint, Gamepad gamepad,
                             double startXmm, double startYmm, double startHeadingDegrees,
                             boolean toggleWithY, BooleanSupplier aimEnabled) {
+        this(turret, pinpoint, () -> toggleWithY ? gamepad.y : gamepad.x, startXmm, startYmm,
+                startHeadingDegrees, aimEnabled);
+    }
+
+    public OdCellAimCommand(Turret turret, Pinpoint pinpoint, BooleanSupplier toggleAllianceRequested,
+                            double startXmm, double startYmm, double startHeadingDegrees,
+                            BooleanSupplier aimEnabled) {
         this.turret = turret;
         this.pinpoint = pinpoint;
-        this.gamepad = gamepad;
+        this.toggleAllianceRequested = Objects.requireNonNull(toggleAllianceRequested);
         this.startXmm = startXmm;
         this.startYmm = startYmm;
         this.startHeadingDegrees = startHeadingDegrees;
-        this.toggleWithY = toggleWithY;
         this.aimEnabled = aimEnabled;
         addRequirements(turret);
     }
 
     @Override
     public void initialize() {
-        lastToggle = toggleWithY ? gamepad.y : gamepad.x;
+        lastToggle = toggleAllianceRequested.getAsBoolean();
     }
 
     @Override
     public void execute() {
-        boolean togglePressed = toggleWithY ? gamepad.y : gamepad.x;
+        boolean togglePressed = toggleAllianceRequested.getAsBoolean();
         if (togglePressed && !lastToggle) blueAlliance = !blueAlliance;
         lastToggle = togglePressed;
 
@@ -89,6 +95,8 @@ public class OdCellAimCommand extends CommandBase {
     public void end(boolean interrupted) {
         turret.stop();
     }
+
+    public void setBlueAlliance(boolean blueAlliance) { this.blueAlliance = blueAlliance; }
 
     public boolean isBlueAlliance() { return blueAlliance; }
     public CellTarget getTarget() { return target; }

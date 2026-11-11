@@ -5,6 +5,8 @@ public final class TurretConstants {
     private TurretConstants() { }
 
     public static String turretMotorName = "turretMotor";
+    /** Keep the turret at its initialization angle until this OpMode stops. */
+    public static final boolean LOCK_STARTUP_ANGLE = true;
     public static double manualPower = 0.50;
 
     /* Measure zero and both mechanical stops before enabling software limits. */

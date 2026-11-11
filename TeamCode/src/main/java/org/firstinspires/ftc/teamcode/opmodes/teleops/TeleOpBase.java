@@ -77,11 +77,20 @@ public abstract class TeleOpBase extends CommandOpMode {
         telemetry.addLine("----- Shooter -----");
         telemetry.addData("State", shooter.getShooterState());
         telemetry.addData("Pitch", shooter.getPitchState());
-        telemetry.addData("Velocity ticks/s", shooter.getAverageVelocity());
+        telemetry.addData("Right flywheel ticks/s", shooter.getFlywheelVelocityTicksPerSecond());
         telemetry.addLine("----- Turret -----");
         telemetry.addData("Encoder ticks", turret.getTurretPos());
         telemetry.addData("Turret degrees", turret.getAngleDegrees());
         telemetry.addData("Target degrees", turret.getTargetDegrees());
         telemetry.update();
+    }
+    @Override
+    public void runOpMode() throws InterruptedException {
+        try {
+            super.runOpMode();
+        } finally {
+            CommandScheduler.getInstance().reset();
+            if (turret != null) turret.shutdown();
+        }
     }
 }

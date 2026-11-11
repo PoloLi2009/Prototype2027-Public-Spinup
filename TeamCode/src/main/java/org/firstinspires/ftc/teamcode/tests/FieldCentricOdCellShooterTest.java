@@ -81,8 +81,8 @@ public class FieldCentricOdCellShooterTest extends CommandOpMode {
                 turret.getAngleDegrees(), aimCommand.getTargetDegrees());
         telemetry.addData("Turret on target", aimCommand.isOnTarget());
         telemetry.addData("Shooter target / left RPM", "%.0f / %.0f",
-                shotCommand.getTargetRpm(), shooter.getLeftFlywheelRpm());
-        telemetry.addData("Shooter tolerance", "%.0f", ShooterConstants.readyToleranceRpm);
+                shotCommand.getTargetRpm(), shooter.getRightFlywheelRpm());
+        telemetry.addData("Shooter ready tolerance fraction", "%.2f", ShooterConstants.readyRelativeTolerance);
         telemetry.addData("Shooter at target", shooter.isAtTargetRpm());
         telemetry.addData("Shooter power", "%.2f", shooter.getCommandedFlywheelPower());
         telemetry.addData("Shot state / gate delay ms", "%s / %d",
@@ -103,6 +103,7 @@ public class FieldCentricOdCellShooterTest extends CommandOpMode {
             if (intake != null) intake.periodic();
             if (shooter != null) shooter.periodic();
             if (transit != null) transit.periodic();
+            if (turret != null) turret.shutdown();
         }
     }
 }

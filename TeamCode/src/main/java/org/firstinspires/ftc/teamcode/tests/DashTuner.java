@@ -6,7 +6,7 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import org.firstinspires.ftc.teamcode.commands.DashboardTuningCommand;
 import org.firstinspires.ftc.teamcode.subsystems.tuning.DashboardTuner;
 
-/** Select this OpMode; edit DashboardTuner fields in FTC Dashboard before INIT. */
+/** Select this OpMode; edit DashboardTuner fields live in FTC Dashboard. */
 @TeleOp(name = "DashTuner", group = "Test")
 public class DashTuner extends CommandOpMode {
     private DashboardTuner tuner;
@@ -16,7 +16,7 @@ public class DashTuner extends CommandOpMode {
         CommandScheduler.getInstance().reset();
         tuner = new DashboardTuner(hardwareMap);
         tuner.setDefaultCommand(new DashboardTuningCommand(tuner));
-        telemetry.addLine("Tune DashboardTuner values in FTC Dashboard.");
+        telemetry.addLine("START, then edit Dashboard > Config > DashboardTuner.");
         telemetry.update();
     }
 

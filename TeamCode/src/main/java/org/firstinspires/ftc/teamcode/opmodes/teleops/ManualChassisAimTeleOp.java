@@ -59,7 +59,7 @@ public class ManualChassisAimTeleOp extends CommandOpMode {
                 : String.format("%.1f / %.1f", target[0], target[1]));
         telemetry.addData("Shot state", shotCommand.getShotState());
         telemetry.addData("Flywheel target / left RPM", "%.0f / %.0f",
-                shotCommand.getTargetRpm(), shooter.getLeftFlywheelRpm());
+                shotCommand.getTargetRpm(), shooter.getRightFlywheelRpm());
         telemetry.addData("Flywheel ready", shooter.isAtTargetRpm());
         telemetry.addData("Pitch command", "%.2f", shooter.getPitchPosition());
         telemetry.update();

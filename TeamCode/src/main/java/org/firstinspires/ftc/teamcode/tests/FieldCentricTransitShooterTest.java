@@ -55,9 +55,9 @@ public class FieldCentricTransitShooterTest extends CommandOpMode {
         telemetry.addData("Pitch left / right", "%.2f / %.2f",
                 shooter.getPitchPosition(), 1.0 - shooter.getPitchPosition());
         telemetry.addData("Shooter target RPM", "%.0f", targetRpm);
-        telemetry.addData("Shooter left RPM", "%.0f", shooter.getLeftFlywheelRpm());
-        telemetry.addData("Shooter RPM error / tolerance", "%.0f / %.0f",
-                targetRpm - shooter.getLeftFlywheelRpm(), ShooterConstants.readyToleranceRpm);
+        telemetry.addData("Shooter right RPM", "%.0f", shooter.getRightFlywheelRpm());
+        telemetry.addData("Shooter TPS / ready tolerance fraction", "%.0f / %.2f",
+                shooter.getFlywheelVelocityTicksPerSecond(), ShooterConstants.readyRelativeTolerance);
         telemetry.addData("Shooter at target", shooter.isAtTargetRpm());
         telemetry.addData("Shooter commanded power", "%.2f", shooter.getCommandedFlywheelPower());
         telemetry.addData("Shot state", shotCommand.getShotState());

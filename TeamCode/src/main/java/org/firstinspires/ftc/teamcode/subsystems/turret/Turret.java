@@ -19,15 +19,34 @@ public class Turret extends SubsystemBase {
     private double targetDegrees = Double.NaN;
     private double integral, previousError;
     private long previousNanos;
+    private double startupDegrees;
+    private boolean initialized;
+    private boolean shutdown;
 
     public Turret(HardwareMap hardwareMap) {
         turretMotor = hardwareMap.get(DcMotorEx.class, TurretConstants.turretMotorName);
         turretMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         resetEncoder();
-        stop();
+        turretMotor.setPower(0);
+        startupDegrees = getAngleDegrees();
+        initialized = true;
+    }
+
+    @Override
+    public void periodic() {
+        if (TurretConstants.LOCK_STARTUP_ANGLE && !shutdown) {
+            updateAim(startupDegrees, 0.0, TurretConstants.startupHoldMaxPower,
+                    TurretConstants.startupHoldKp, TurretConstants.startupHoldKd,
+                    TurretConstants.startupHoldToleranceDegrees);
+        }
     }
 
     public void rotate(double power) {
+        if (shutdown || TurretConstants.LOCK_STARTUP_ANGLE) return;
+        applyRotation(power);
+    }
+
+    private void applyRotation(double power) {
         double output = Range.clip(power, -1.0, 1.0);
         if (TurretConstants.useSoftLimits) {
             double angle = getAngleDegrees();
@@ -57,10 +76,13 @@ public class Turret extends SubsystemBase {
     }
 
     public void setPower(double power) {
+        if (shutdown || TurretConstants.LOCK_STARTUP_ANGLE) return;
         turretMotor.setPower(Range.clip(power, -1.0, 1.0));
     }
 
     public void resetEncoder() {
+        // Re-zeroing during a locked session would move the physical hold reference.
+        if (shutdown || (initialized && TurretConstants.LOCK_STARTUP_ANGLE)) return;
         turretMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         turretMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
     }
@@ -103,10 +125,23 @@ public class Turret extends SubsystemBase {
     private boolean aimAtPhysicalDegrees(double physicalDegrees, double minimumPower,
                                          double maximumPower, double kP, double kD,
                                          double toleranceDegrees) {
+        if (shutdown) return false;
+        if (TurretConstants.LOCK_STARTUP_ANGLE) {
+            // Reject other targets so automatic shooting cannot claim they were reached.
+            return Double.isFinite(physicalDegrees)
+                    && Math.abs(physicalDegrees - startupDegrees)
+                    <= TurretConstants.startupHoldToleranceDegrees;
+        }
+        return updateAim(physicalDegrees, minimumPower, maximumPower, kP, kD, toleranceDegrees);
+    }
+
+    private boolean updateAim(double physicalDegrees, double minimumPower,
+                              double maximumPower, double kP, double kD,
+                              double toleranceDegrees) {
         if (!Double.isFinite(physicalDegrees)
                 || physicalDegrees < TurretConstants.minDegrees()
                 || physicalDegrees > TurretConstants.maxDegrees()) {
-            stop();
+            turretMotor.setPower(0.0);
             return false;
         }
         double current = getAngleDegrees();
@@ -136,8 +171,14 @@ public class Turret extends SubsystemBase {
         }
         previousError = error;
         previousNanos = now;
-        rotate(output);
+        applyRotation(output);
         return true;
+    }
+
+    /** OpMode exit must remove power even when startup-angle holding is enabled. */
+    public void shutdown() {
+        shutdown = true;
+        stop();
     }
 
     public double getTargetDegrees() { return targetDegrees; }
@@ -146,7 +187,9 @@ public class Turret extends SubsystemBase {
         return getEncoderTicks();
     }
 
+    /** Cancel a motion request; startup-angle holding continues until shutdown. */
     public void stop() {
+        if (TurretConstants.LOCK_STARTUP_ANGLE && !shutdown) return;
         targetDegrees = Double.NaN;
         integral = 0;
         previousNanos = 0;

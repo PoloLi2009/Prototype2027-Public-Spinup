@@ -1,6 +1,8 @@
 package org.firstinspires.ftc.teamcode.commands;
 
+import java.util.Objects;
 import com.arcrobotics.ftclib.command.CommandBase;
+import java.util.function.DoubleSupplier;
 import com.qualcomm.robotcore.hardware.Gamepad;
 import org.firstinspires.ftc.teamcode.subsystems.turret.Turret;
 import org.firstinspires.ftc.teamcode.subsystems.turret.TurretConstants;
@@ -16,23 +18,28 @@ public class TurretLimitCommand extends CommandBase {
     private static final double PID_KP = 0.03;
 
     private final Turret turret;
-    private final Gamepad gamepad;
+    private final DoubleSupplier rotationRequest;
     private boolean rewinding;
     private double rewindTargetDegrees;
     private double rewindStartAngleDegrees;
     private long rewindStartNanos;
 
     public TurretLimitCommand(Turret turret, Gamepad gamepad) {
+        this(turret, () -> gamepad.left_stick_x);
+    }
+
+    /** Live control inputs; axes retain the original command signs and deadbands. */
+    public TurretLimitCommand(Turret turret, DoubleSupplier rotationRequest) {
         this.turret = turret;
-        this.gamepad = gamepad;
+        this.rotationRequest = Objects.requireNonNull(rotationRequest);
         addRequirements(turret);
     }
 
     @Override
     public void execute() {
         double angle = turret.getAngleDegrees();
-        double stick = Math.abs(gamepad.left_stick_x) > STICK_DEADBAND
-                ? gamepad.left_stick_x : 0.0;
+        double stick = Math.abs(rotationRequest.getAsDouble()) > STICK_DEADBAND
+                ? rotationRequest.getAsDouble() : 0.0;
         double min = TurretConstants.minDegrees();
         double max = TurretConstants.maxDegrees();
         if (rewinding) {

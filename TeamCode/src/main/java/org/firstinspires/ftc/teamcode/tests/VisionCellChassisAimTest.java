@@ -62,7 +62,7 @@ public class VisionCellChassisAimTest extends CommandOpMode {
                 vision, turretHold, gamepad1);
         drive.setDefaultCommand(chassisAim);
         double rpmStep = FLYWHEEL_STEP_TICKS_PER_SECOND * 60.0
-                / ShooterConstants.leftEncoderTicksPerRevolution;
+                / ShooterConstants.rightEncoderTicksPerRevolution;
         shotCommand = new SequencedShotCommand(intake, shooter, transit, gamepad1,
                 START_FLYWHEEL_RPM, chassisAim::isOnTarget,
                 Intake.IntakeState.FAST_FORWARD, Intake.IntakeState.FAST_REVERSED, rpmStep,
@@ -98,9 +98,9 @@ public class VisionCellChassisAimTest extends CommandOpMode {
         telemetry.addData("Shot", "%s | gate %s | intake %s",
                 shotCommand.getShotState(), transit.getGateState(), intake.getIntakeState());
         double targetTicksPerSecond = shotCommand.getTargetRpm()
-                * ShooterConstants.leftEncoderTicksPerRevolution / 60.0;
+                * ShooterConstants.rightEncoderTicksPerRevolution / 60.0;
         telemetry.addData("Flywheel ticks/s", "%.0f / %.0f | pwr %.2f",
-                shooter.getAverageVelocity(), targetTicksPerSecond, shooter.getCommandedFlywheelPower());
+                shooter.getFlywheelVelocityTicksPerSecond(), targetTicksPerSecond, shooter.getCommandedFlywheelPower());
         double leftPitch = shooter.getPitchPosition();
         telemetry.addData("Pitch L/R", "%.2f / %.2f | turret %s",
                 leftPitch, 1.0 - leftPitch, turretHold.isOnTarget() ? "locked" : "off angle");
@@ -118,7 +118,7 @@ public class VisionCellChassisAimTest extends CommandOpMode {
             if (shooter != null) shooter.periodic();
             if (transit != null) transit.periodic();
             if (drive != null) drive.stop();
-            if (turret != null) turret.stop();
+            if (turret != null) turret.shutdown();
             if (vision != null) vision.stop();
         }
     }
