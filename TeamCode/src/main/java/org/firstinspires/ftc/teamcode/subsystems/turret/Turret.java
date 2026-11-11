@@ -87,6 +87,22 @@ public class Turret extends SubsystemBase {
     /** Test-specific PID strength; other aiming callers keep their usual tuning. */
     public boolean aimAtPhysicalDegrees(double physicalDegrees, double minimumPower,
                                         double maximumPower, double kP) {
+        return aimAtPhysicalDegrees(physicalDegrees, minimumPower, maximumPower, kP,
+                TurretConstants.kD,
+                TurretConstants.angleToleranceDegrees);
+    }
+
+    /** Strong, tight position hold used by the chassis aiming test to prevent turret wobble. */
+    public boolean holdAtPhysicalDegrees(double physicalDegrees) {
+        return aimAtPhysicalDegrees(physicalDegrees, 0.0,
+                TurretConstants.startupHoldMaxPower, TurretConstants.startupHoldKp,
+                TurretConstants.startupHoldKd,
+                TurretConstants.startupHoldToleranceDegrees);
+    }
+
+    private boolean aimAtPhysicalDegrees(double physicalDegrees, double minimumPower,
+                                         double maximumPower, double kP, double kD,
+                                         double toleranceDegrees) {
         if (!Double.isFinite(physicalDegrees)
                 || physicalDegrees < TurretConstants.minDegrees()
                 || physicalDegrees > TurretConstants.maxDegrees()) {
@@ -110,9 +126,9 @@ public class Turret extends SubsystemBase {
                     TurretConstants.integralLimitDegreeSeconds);
         }
         double output = Range.clip(error * kP
-                + integral * TurretConstants.kI + derivative * TurretConstants.kD,
+                + integral * TurretConstants.kI + derivative * kD,
                 -maximumPower, maximumPower);
-        if (Math.abs(error) <= TurretConstants.angleToleranceDegrees) {
+        if (Math.abs(error) <= toleranceDegrees) {
             output = 0;
             integral = 0;
         } else if (minimumPower > 0 && Math.abs(output) < minimumPower) {

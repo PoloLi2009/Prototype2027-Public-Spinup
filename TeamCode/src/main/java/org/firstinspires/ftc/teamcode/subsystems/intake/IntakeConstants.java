@@ -4,8 +4,11 @@ package org.firstinspires.ftc.teamcode.subsystems.intake;
 public final class IntakeConstants {
     private IntakeConstants() { }
 
-    public static String intakeMotorName = "intakeTransit";
-    public static double intakePower = 0.85;
+    public static String transitMotorName = "transitMotor";
+    public static double intakePower = 0.65;
     public static double reversePower = -0.65;
-    public static double feedPower = 0.75;
+    // Combined CELL shooting tests select these stronger manual modes.
+    public static double fastIntakePower = 0.85;
+    public static double fastReversePower = -0.85;
+    public static double feedPower = 1.0;
 }

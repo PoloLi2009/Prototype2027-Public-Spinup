@@ -4,11 +4,11 @@ package org.firstinspires.ftc.teamcode.subsystems.transit;
 public final class TransitConstants {
     private TransitConstants() { }
 
-    public static String gateServoName = "ballGate";
+    public static String limitServoName = "limitServo";
 
-    // Tune on the real mechanism before allowing the flywheels to run.
-    public static double gateClosedPosition = 0.15;
-    public static double gateOpenPosition = 0.72;
+    // Measured limit-servo positions: open at 0.15, closed at 0.32.
+    public static double gateClosedPosition = 0.32;
+    public static double gateOpenPosition = 0.15;
 
     /** Wait for the blocking rod to clear before starting the shared intake/transit motor. */
     public static long gateRetractDelayMs = 250;

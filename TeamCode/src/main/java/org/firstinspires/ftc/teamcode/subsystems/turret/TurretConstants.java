@@ -14,10 +14,20 @@ public final class TurretConstants {
     public static double minDegrees() { return -travelDegrees / 2.0; }
     public static double maxDegrees() { return travelDegrees / 2.0; }
     public static int powerSign = -1;
-    public static double kP = 0.01; // power per degree; initial value, tune on robot
+    public static double kP = 0.02; // power per degree; initial value, tune on robot
     public static double kI = 0;
     public static double kD = 0;
     public static double integralLimitDegreeSeconds = 50;
-    public static double maxAimPower = 0.25;
+    public static double maxAimPower = 0.50;
     public static double angleToleranceDegrees = 1.0;
+    /** Position hold for the vision chassis-aim test. */
+    public static double startupHoldKp = 0.04;
+    public static double startupHoldKd = 0.0;
+    public static double startupHoldMaxPower = 0.25;
+    public static double startupHoldToleranceDegrees = 0.5;
+
+    public static double odCellAimKp = 0.030;
+    public static double odCellAimMaxPower = 0.75;
+    public static double headingHoldKp = 0.030;
+    public static double headingHoldMaxPower = 0.75;
 }

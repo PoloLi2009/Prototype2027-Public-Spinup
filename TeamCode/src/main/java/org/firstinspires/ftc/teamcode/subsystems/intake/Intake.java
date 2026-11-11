@@ -12,8 +12,10 @@ public class Intake extends SubsystemBase {
     public enum IntakeState {
         STOP(0),
         FORWARD(IntakeConstants.intakePower),
+        FAST_FORWARD(IntakeConstants.fastIntakePower),
         FEED(IntakeConstants.feedPower),
-        REVERSED(IntakeConstants.reversePower);
+        REVERSED(IntakeConstants.reversePower),
+        FAST_REVERSED(IntakeConstants.fastReversePower);
 
         final double power;
 
@@ -23,7 +25,7 @@ public class Intake extends SubsystemBase {
     }
 
     public Intake(HardwareMap hardwareMap) {
-        intakeMotor = hardwareMap.get(DcMotor.class, IntakeConstants.intakeMotorName);
+        intakeMotor = hardwareMap.get(DcMotor.class, IntakeConstants.transitMotorName);
         intakeMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         stop();
     }

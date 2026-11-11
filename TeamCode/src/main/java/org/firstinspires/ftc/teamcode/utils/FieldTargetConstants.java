@@ -15,8 +15,8 @@ public final class FieldTargetConstants {
     public static double lowerHiveXmm = -458.6;
     public static double blueCellYmm = 321.4;
     public static double redCellYmm = -321.4;
-    public static double chassisAimKp = 0.015;
-    public static double maxChassisAimPower = 0.35;
+    public static double chassisAimKp = 0.040;
+    public static double maxChassisAimPower = 0.85;
 
     /** Upper / lower is chosen from the robot's current Pinpoint Y coordinate. */
     public static double[] target(Alliance alliance, double robotYmm) {

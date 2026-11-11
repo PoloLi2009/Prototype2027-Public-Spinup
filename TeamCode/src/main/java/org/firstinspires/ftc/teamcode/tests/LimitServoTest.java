@@ -1,47 +1,40 @@
 package org.firstinspires.ftc.teamcode.tests;
 
-import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.arcrobotics.ftclib.command.CommandOpMode;
+import com.arcrobotics.ftclib.command.CommandScheduler;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
-import com.qualcomm.robotcore.hardware.Servo;
+import org.firstinspires.ftc.teamcode.commands.LimitServoTrimCommand;
+import org.firstinspires.ftc.teamcode.subsystems.transit.Transit;
 import org.firstinspires.ftc.teamcode.subsystems.transit.TransitConstants;
 
 @TeleOp(name = "Limit Servo Test", group = "Test")
-public class LimitServoTest extends OpMode {
-    private static final double STEP = 0.01;
-
-    private Servo limitServo;
-    private double position;
-    private boolean wasDpadUpPressed;
-    private boolean wasDpadDownPressed;
+public class LimitServoTest extends CommandOpMode {
+    private Transit transit;
+    private LimitServoTrimCommand command;
 
     @Override
-    public void init() {
-        limitServo = hardwareMap.get(Servo.class, TransitConstants.gateServoName);
-        position = TransitConstants.gateClosedPosition;
-        limitServo.setPosition(position);
+    public void initialize() {
+        CommandScheduler.getInstance().reset();
+        transit = new Transit(hardwareMap);
+        command = new LimitServoTrimCommand(transit, gamepad1);
+        transit.setDefaultCommand(command);
+        transit.periodic();
         telemetry.addLine("D-pad up: +0.01 | D-pad down: -0.01");
-        telemetry.addData("Servo hardware name", TransitConstants.gateServoName);
+        telemetry.addData("Servo hardware name", TransitConstants.limitServoName);
         telemetry.update();
     }
 
     @Override
-    public void loop() {
-        if (gamepad1.dpad_up && !wasDpadUpPressed) {
-            position = clamp(position + STEP);
-        }
-        if (gamepad1.dpad_down && !wasDpadDownPressed) {
-            position = clamp(position - STEP);
-        }
-        wasDpadUpPressed = gamepad1.dpad_up;
-        wasDpadDownPressed = gamepad1.dpad_down;
-
-        limitServo.setPosition(position);
-        telemetry.addData("Limit servo position", "%.2f", position);
+    public void run() {
+        CommandScheduler.getInstance().run();
+        telemetry.addData("Limit servo position", "%.2f", command.getPosition());
         telemetry.addData("Position range", "0.00 to 1.00");
         telemetry.update();
     }
 
-    private double clamp(double value) {
-        return Math.max(0.0, Math.min(1.0, value));
+    @Override
+    public void runOpMode() throws InterruptedException {
+        try { super.runOpMode(); }
+        finally { CommandScheduler.getInstance().reset(); }
     }
 }

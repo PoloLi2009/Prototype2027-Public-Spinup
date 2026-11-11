@@ -10,6 +10,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
 /** Minimal wrapper for the FTC SDK goBILDA Pinpoint driver. */
 public class Pinpoint extends SubsystemBase {
     private final GoBildaPinpointDriver pinpoint;
+    private boolean fieldPoseInitialized;
 
     public Pinpoint(HardwareMap hardwareMap) {
         pinpoint = hardwareMap.get(GoBildaPinpointDriver.class, PinpointConstants.pinpointName);
@@ -28,7 +29,21 @@ public class Pinpoint extends SubsystemBase {
 
     /** Sets the current physical robot pose as the field origin and forward heading. */
     public void resetFieldPose() {
-        pinpoint.setPosition(new Pose2D(DistanceUnit.MM, 0, 0, AngleUnit.DEGREES, 0));
+        setFieldPose(0, 0, 0);
+    }
+
+    public void setFieldPose(double xMm, double yMm, double headingDegrees) {
+        pinpoint.setPosition(new Pose2D(DistanceUnit.MM, xMm, yMm,
+                AngleUnit.DEGREES, headingDegrees));
+        fieldPoseInitialized = true;
+    }
+
+    public boolean isFieldPoseInitialized() {
+        return fieldPoseInitialized;
+    }
+
+    public boolean isReady() {
+        return pinpoint.getDeviceStatus() == GoBildaPinpointDriver.DeviceStatus.READY;
     }
 
     public double getXmm() {

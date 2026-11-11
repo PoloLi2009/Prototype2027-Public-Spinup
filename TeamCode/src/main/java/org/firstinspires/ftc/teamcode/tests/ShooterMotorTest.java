@@ -1,38 +1,35 @@
 package org.firstinspires.ftc.teamcode.tests;
 
-import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.arcrobotics.ftclib.command.CommandOpMode;
+import com.arcrobotics.ftclib.command.CommandScheduler;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
-import com.qualcomm.robotcore.hardware.DcMotor;
-import com.qualcomm.robotcore.hardware.DcMotorEx;
-import com.qualcomm.robotcore.hardware.DcMotorSimple;
+import org.firstinspires.ftc.teamcode.commands.ShooterMotorTestCommand;
+import org.firstinspires.ftc.teamcode.subsystems.shooter.Shooter;
 
 @TeleOp(name = "Shooter Motor Test", group = "Test")
-public class ShooterMotorTest extends OpMode {
-    private DcMotorEx leftShooterMotor;
-    private DcMotorEx rightShooterMotor;
+public class ShooterMotorTest extends CommandOpMode {
+    private Shooter shooter;
 
     @Override
-    public void init() {
-        leftShooterMotor = hardwareMap.get(DcMotorEx.class, "leftFlywheelMotor");
-        rightShooterMotor = hardwareMap.get(DcMotorEx.class, "rightFlywheelMotor");
-
-        leftShooterMotor.setDirection(DcMotorSimple.Direction.FORWARD);
-        rightShooterMotor.setDirection(DcMotorSimple.Direction.REVERSE);
-        leftShooterMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        rightShooterMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+    public void initialize() {
+        CommandScheduler.getInstance().reset();
+        shooter = new Shooter(hardwareMap, false);
+        shooter.setDefaultCommand(new ShooterMotorTestCommand(shooter));
         telemetry.addLine("Press START: both shooter motors run at full power.");
         telemetry.update();
     }
 
     @Override
-    public void loop() {
-        leftShooterMotor.setPower(1.0);
-        rightShooterMotor.setPower(1.0);
+    public void run() {
+        CommandScheduler.getInstance().run();
     }
 
     @Override
-    public void stop() {
-        leftShooterMotor.setPower(0.0);
-        rightShooterMotor.setPower(0.0);
+    public void runOpMode() throws InterruptedException {
+        try { super.runOpMode(); }
+        finally {
+            CommandScheduler.getInstance().reset();
+            if (shooter != null) { shooter.stop(); shooter.periodic(); }
+        }
     }
 }

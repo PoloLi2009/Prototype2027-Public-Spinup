@@ -49,6 +49,21 @@ public class Drive extends SubsystemBase {
                 * DriveConstants.teleOpScale);
     }
 
+    /** Field forward/right commands, using the tested motor signs of this chassis. */
+    public void moveFieldCentric(double fieldForward, double fieldRight, double turn,
+                                 double headingDegrees) {
+        if (!Double.isFinite(headingDegrees)) {
+            stop();
+            return;
+        }
+        double radians = Math.toRadians(headingDegrees);
+        double cos = Math.cos(radians);
+        double sin = Math.sin(radians);
+        double robotForward = fieldForward * cos - fieldRight * sin;
+        double robotRight = fieldForward * sin + fieldRight * cos;
+        moveRobot(-robotForward, robotRight, turn);
+    }
+
     public void stop() {
         leftFrontMotor.setPower(0);
         leftBackMotor.setPower(0);

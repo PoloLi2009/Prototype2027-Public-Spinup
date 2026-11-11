@@ -4,18 +4,21 @@ package org.firstinspires.ftc.teamcode.subsystems.shooter;
 public final class ShooterConstants {
     private ShooterConstants() { }
 
-    public static String leftShooterName = "Left Flywheel Motor";
-    public static String rightShooterName = "Right Flywheel Motor";
-    public static String leftPitchServoName = "Left Pitch Servo";
-    public static String rightPitchServoName = "Right Pitch Servo";
+    public static String leftShooterName = "leftShooterMotor";
+    public static String rightShooterName = "rightShooterMotor";
+    public static String leftPitchServoName = "leftPitchServo";
+    public static String rightPitchServoName = "rightPitchServo";
 
-    // Start with open-loop power; move to velocity PIDF after real ball testing.
+    // Open-loop presets remain available; RPM mode uses the left encoder for feedback.
     public static double lowPower = 0.65;
     public static double highPower = 0.90;
     public static double targetRpm = 6000.0;
     public static double readyToleranceRpm = 100.0;
-    public static double rightEncoderTicksPerRevolution = 28.0;
-    public static double leftFlywheelFollowPower = 1.0;
+    // Left motor encoder counts per motor revolution; confirm this for the installed motor.
+    public static double leftEncoderTicksPerRevolution = 28.0;
+    public static double maxRpm = 6000.0;
+    public static double flywheelKpPowerPerRpm = 0.0002;
+    public static double flywheelKiPowerPerRpmSecond = 0.00030;
 
     // Temporary neutral point. Calibrate limits before using the shooter on the field.
     public static double pitchLowPosition = 0.50;
