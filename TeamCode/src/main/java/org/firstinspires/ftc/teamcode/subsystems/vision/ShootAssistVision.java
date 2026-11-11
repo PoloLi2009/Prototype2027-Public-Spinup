@@ -21,6 +21,30 @@ import org.firstinspires.ftc.teamcode.subsystems.field.CellTarget;
  * (its pipeline/age/tag checks) and are corrected by Spinup {@link HiveFlatPoseSolver} with the
  * turret angle; CELL points are Spinup {@link CellTarget}; shooter offset is
  * {@link ShootAssistConstants#shooterYawDegrees} (Spinup shoots forward: 0 deg, Overtune 180).</p>
+ *
+ * <pre>
+ * ===================== 视觉上车前必看（2026-11-11 代码审查结论） =====================
+ * 代码链路已核对：Limelight MT1 帧 -> HiveFlatPoseSolver（HIVE 倾斜修正 + 云台角）-> 场地中心坐标(mm)
+ * -> 写入 Pinpoint（跳变门：>1 in 或 >5° 先拒绝，连续 3 帧才强制）-> 与 CellTarget 同一坐标系算偏航误差和距离。
+ * 逻辑上可用；以下几点代码里无法保证，必须上车确认：
+ *
+ * 1. Robot Configuration 里必须有名为 "limelight" 的 Limelight 3A（VisionConstants.hardwareName）。
+ *    solo 在 INIT 就会构造 LimelightVision，没有这个设备会直接报错退出（旧版 solo 不需要它）。
+ * 2. Limelight 网页设置必须与 VisionConstants.cameraWebPose 一致（前 0.117 m、离地 0.278 m、
+ *    俯仰 50°、偏航 0°、横滚 180° = 相机倒置）。代码不会再套一次这些值，也不会翻转图像。
+ * 3. 蓝方 pipeline 0、红方 pipeline 1，各自只识别本方 HIVE 标签（蓝 38–45，红 30–37）。
+ *    一帧里只要出现对方标签，整帧丢弃（遥测 Vision 显示 "Unexpected HIVE tag ID(s)"）。
+ * 4. 至少同时看到 2 个本方标签（VisionConstants.minimumTagCount）才会产生位姿；
+ *    站位太偏时可能一直校准不上，看遥测 Vision / Calibration 两行。
+ * 5. INIT 前云台必须手动对正车头：车的朝向 = 相机算出的云台朝向 + 启动锁定角，
+ *    没对正会让位置、朝向和瞄准一起偏。
+ * 6. 默认蓝方；打红方在 INIT 按 X 切换（遥测 "Alliance / CELL"）。
+ * 7. 帧从拍摄到写入 Pinpoint 最多约 200 ms，期间车的运动没有补偿（与 Overtune 相同）。
+ *    按住 RT 后车会原地锁位，影响小；开动中校准会有误差。
+ * 8. 上车判断视觉是否工作：遥测 "Localization" 出现 "Initialized..." 或
+ *    "Vision correction applied"，且 "Shot distance cm" 有数值。
+ * ==================================================================================
+ * </pre>
  */
 public class ShootAssistVision {
     private static final int REQUIRED_RT_CALIBRATIONS = 2;
