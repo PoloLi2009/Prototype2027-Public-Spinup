@@ -5,6 +5,7 @@ import org.firstinspires.ftc.teamcode.commands.ShootAssistCommand;
 import org.firstinspires.ftc.teamcode.subsystems.drive.AutoAimController;
 import org.firstinspires.ftc.teamcode.subsystems.drive.Drive;
 import org.firstinspires.ftc.teamcode.subsystems.drive.PedroDrive;
+import org.firstinspires.ftc.teamcode.subsystems.drive.ShootAssistConstants;
 import org.firstinspires.ftc.teamcode.subsystems.drive.ShootAssistDrive;
 import org.firstinspires.ftc.teamcode.subsystems.field.CellTarget;
 import org.firstinspires.ftc.teamcode.subsystems.intake.Intake;
@@ -52,7 +53,7 @@ public class ShootAssistCheck {
                 () -> Math.toRadians(pp.h), () -> pp.ready, t -> t);
         blue.initialize();
         sd = new ShootAssistDrive(drive, () -> pp, () -> pp.ready, blue);
-        shooter = new ShootAssistShooter(shooterHw, () -> 900.0);
+        shooter = new ShootAssistShooter(shooterHw);
         transit = new ShootAssistTransit(gate, motor);
         intake = new ShootAssistIntake(transit);
         vision = new ShootAssistVision(ll, () -> 0.0);
@@ -191,6 +192,38 @@ public class ShootAssistCheck {
                 new AutoHiveTarget(c.vision, CellTarget.BLUE_LOWER), () -> false, 300, 400, false);
         noLoc.initialize(); noLoc.execute();
         check(!c.shooterHw.running && noLoc.getStatus().contains("localization"), "no localization, no spin-up");
+
+        // 10. Overtune adaptive table: interpolate velocity+pitch, clamp at the ends, override velocity only.
+        double[][] near = ShootAssistConstants.nearShotPoints, far = ShootAssistConstants.farShotPoints;
+        try {
+            check(ShootAssistShooter.areDistanceShotValuesValid(), "seeded Spinup table is valid");
+            ShootAssistCheck d = new ShootAssistCheck();
+            d.shooter.setDistanceTarget(100.0);
+            check(Math.abs(d.shooter.getTargetVelocity() - 900) < 1e-9 && Math.abs(d.shooterHw.pitch - 0.5) < 1e-9,
+                    "seeded table keeps Spinup 900 TPS / pitch 0.50");
+            ShootAssistConstants.nearShotPoints = new double[][]{{50,800,0.6},{60,850,0.55},{70,900,0.5},{80,950,0.45},{90,1000,0.4}};
+            ShootAssistConstants.farShotPoints = new double[][]{{100,1050,0.35},{110,1100,0.3},{120,1150,0.25},{130,1200,0.2},{140,1250,0.15}};
+            d.shooter.setDistanceTarget(65.0);
+            check(Math.abs(d.shooter.getTargetVelocity() - 875) < 1e-9 && Math.abs(d.shooterHw.pitch - 0.525) < 1e-9,
+                    "interpolates between rows: " + d.shooter.getTargetVelocity() + " / " + d.shooterHw.pitch);
+            d.shooter.setDistanceTarget(95.0);
+            check(Math.abs(d.shooter.getTargetVelocity() - 1025) < 1e-9, "bridges the near/far gap");
+            d.shooter.setDistanceTarget(10.0);
+            check(Math.abs(d.shooter.getTargetVelocity() - 800) < 1e-9 && Math.abs(d.shooterHw.pitch - 0.6) < 1e-9, "clamps below");
+            d.shooter.setDistanceTarget(500.0);
+            check(Math.abs(d.shooter.getTargetVelocity() - 1250) < 1e-9, "clamps above");
+            double before = d.shooterHw.pitch;
+            d.shooter.setDistanceTarget(65.0, false);
+            check(d.shooterHw.pitch == before && Math.abs(d.shooter.getTargetVelocity() - 875) < 1e-9, "pre-spin leaves pitch");
+            ShootAssistShooter o = new ShootAssistShooter(d.shooterHw, () -> 1.0, () -> 1111.0);
+            o.setDistanceTarget(65.0);
+            check(Math.abs(o.getTargetVelocity() - 1111) < 1e-9 && Math.abs(d.shooterHw.pitch - 0.525) < 1e-9,
+                    "override replaces velocity only");
+            ShootAssistConstants.farShotPoints = new double[][]{{100,1050,0.35}};
+            check(!d.shooter.setDistanceTarget(65.0) && !d.shooterHw.running, "invalid table stops the flywheel");
+        } finally {
+            ShootAssistConstants.nearShotPoints = near; ShootAssistConstants.farShotPoints = far;
+        }
 
         System.out.println("PASS ShootAssistCheck: " + checks + " assertions");
     }

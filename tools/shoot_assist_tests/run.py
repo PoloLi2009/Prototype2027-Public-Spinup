@@ -51,7 +51,8 @@ public class PedroDrive { public Pose pose=new Pose(72,72,0); public Velocity ve
 public class Shooter { public double targetRpm, velocity, pitch=0.5; public boolean running;
  public void startFlywheelsAtTargetRpm(double rpm){targetRpm=rpm;running=true;}
  public void stop(){running=false;targetRpm=0;} public void periodic(){}
- public double getFlywheelVelocityTicksPerSecond(){return velocity;} public double getPitchPosition(){return pitch;} }''',
+ public double getFlywheelVelocityTicksPerSecond(){return velocity;} public double getPitchPosition(){return pitch;}
+ public void adjustPitch(double d){pitch=Math.max(0,Math.min(1,pitch+d));} }''',
 'transit/Transit.java': P + '''transit;
 public class Transit { public enum GateState{CLOSED,OPEN} public GateState gate=GateState.CLOSED;
  public void setGateState(GateState g){gate=g;} public GateState getGateState(){return gate;} }''',
@@ -79,6 +80,10 @@ public final class HiveFrameSolver { public static final class Observation {
 with tempfile.TemporaryDirectory(prefix='spinup-shoot-assist-') as tmp:
     t = Path(tmp)
     files = []
+    cfg = t / 'src/com/acmerobotics/dashboard/config/Config.java'
+    cfg.parent.mkdir(parents=True, exist_ok=True)
+    cfg.write_text('package com.acmerobotics.dashboard.config; public @interface Config { String value() default ""; }')
+    files.append(str(cfg))
     for rel, body in fakes.items():
         p = t / 'src/org/firstinspires/ftc/teamcode/subsystems' / rel
         p.parent.mkdir(parents=True, exist_ok=True); p.write_text(body); files.append(str(p))

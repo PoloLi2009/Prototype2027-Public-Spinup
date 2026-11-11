@@ -10,14 +10,18 @@ import org.firstinspires.ftc.teamcode.subsystems.drive.ShootAssistConstants;
  * (setDistanceTarget / isReady / isPitchReady / stop), on top of Spinup's own {@link Shooter}
  * PIDF and right-encoder feedback.
  *
- * <p>Spinup has no distance shot table, so setDistanceTarget follows Overtune's
- * "fixed distance target velocity" branch: any valid distance selects the supplied fixed TPS
- * (Solo: 900 TPS, D-pad adjustable) and pitch is left at Spinup's current preset. Readiness keeps
- * Overtune's enter/exit hysteresis and stable-time logic with Spinup's +/-30 TPS window.</p>
+ * <p>setDistanceTarget is Overtune's adaptive shot, copied: interpolate {distance, ticks/s, pitch}
+ * between the bracketing rows of near+far tables (clamped beyond the ends), optionally move the
+ * pitch, then use the fixed override velocity when it is positive, otherwise table velocity x
+ * scale. Tables live in {@link ShootAssistConstants}. Readiness keeps Overtune's enter/exit
+ * hysteresis and stable-time logic with Spinup's +/-30 TPS window.</p>
  */
 public class ShootAssistShooter {
     private final Shooter shooter;
-    private final DoubleSupplier fixedTargetTicksPerSecond;
+    private static final int SHOT_POINTS_PER_RANGE = 5;
+    private final DoubleSupplier distanceVelocityScale;
+    // Zero keeps distance-based velocity; positive values override velocity only, not pitch.
+    private final DoubleSupplier fixedDistanceTargetVelocity;
     private double targetVelocity = Double.NaN;
     private double velocitySettleReferenceTarget = Double.NaN;
     private boolean velocityControlActive;
@@ -26,20 +30,110 @@ public class ShootAssistShooter {
     private double pitchSettleReferencePosition;
     private long pitchChangedAtNanos;
 
-    public ShootAssistShooter(Shooter shooter, DoubleSupplier fixedTargetTicksPerSecond) {
+    /** Distance table velocity and pitch (Overtune Shooter(hardwareMap)). */
+    public ShootAssistShooter(Shooter shooter) {
+        this(shooter, () -> 1.0, () -> 0.0);
+    }
+
+    /**
+     * @param distanceVelocityScale  Overtune per-instance scale of table velocity, (0, 1]
+     * @param fixedDistanceTargetVelocity positive ticks/s overrides table velocity (pitch still follows distance)
+     */
+    public ShootAssistShooter(Shooter shooter, DoubleSupplier distanceVelocityScale,
+                              DoubleSupplier fixedDistanceTargetVelocity) {
         this.shooter = Objects.requireNonNull(shooter);
-        this.fixedTargetTicksPerSecond = Objects.requireNonNull(fixedTargetTicksPerSecond);
+        this.distanceVelocityScale = Objects.requireNonNull(distanceVelocityScale);
+        this.fixedDistanceTargetVelocity = Objects.requireNonNull(fixedDistanceTargetVelocity);
         pitchSettleReferencePosition = shooter.getPitchPosition();
         pitchChangedAtNanos = System.nanoTime();
     }
 
     public boolean setDistanceTarget(double distanceCm) {
-        if (!Double.isFinite(distanceCm) || distanceCm < 0.0 || !areReadyValuesValid()) {
+        return setDistanceTarget(distanceCm, true);
+    }
+
+    /** Overtune Shooter.setDistanceTarget, line for line (Spinup readiness check in place of PID calibration). */
+    public boolean setDistanceTarget(double distanceCm, boolean updatePitch) {
+        double[][] points = getDistanceShotPoints();
+        double scale = distanceVelocityScale.getAsDouble();
+        if (points == null || !areReadyValuesValid()
+                || !Double.isFinite(distanceCm) || distanceCm < 0.0
+                || !Double.isFinite(scale) || scale <= 0.0 || scale > 1.0) {
             stop();
             return false;
         }
-        setTargetVelocity(fixedTargetTicksPerSecond.getAsDouble());
+        double[] lower = null;
+        double[] upper = null;
+        for (double[] point : points) {
+            if (point[0] <= distanceCm && (lower == null || point[0] > lower[0])) lower = point;
+            if (point[0] >= distanceCm && (upper == null || point[0] < upper[0])) upper = point;
+        }
+        // Adjacent points also cover the gap between tables. Clamp beyond the outer endpoints.
+        if (lower == null) lower = upper;
+        if (upper == null) upper = lower;
+        double fraction = lower == upper ? 0.0
+                : (distanceCm - lower[0]) / (upper[0] - lower[0]);
+        double velocity = (1.0 - fraction) * lower[1] + fraction * upper[1];
+        if (updatePitch) {
+            double pitch = (1.0 - fraction) * lower[2] + fraction * upper[2];
+            setPitchPosition(pitch);
+        }
+        double fixedVelocity = fixedDistanceTargetVelocity.getAsDouble();
+        setTargetVelocity(fixedVelocity > 0.0 ? fixedVelocity : velocity * scale);
         return hasTargetVelocity();
+    }
+
+    public static boolean areDistanceShotValuesValid() {
+        return areReadyValuesValid() && getDistanceShotPoints() != null;
+    }
+
+    /** Returns the ordered near and far points, or null when the tables are invalid. */
+    public static double[][] getDistanceShotPoints() {
+        double[][] near = ShootAssistConstants.nearShotPoints;
+        double[][] far = ShootAssistConstants.farShotPoints;
+        if (near == null || far == null
+                || near.length != SHOT_POINTS_PER_RANGE || far.length != SHOT_POINTS_PER_RANGE
+                || !Double.isFinite(ShootAssistConstants.pitchMinPosition)
+                || !Double.isFinite(ShootAssistConstants.pitchMaxPosition)
+                || ShootAssistConstants.pitchMinPosition < 0.0
+                || ShootAssistConstants.pitchMaxPosition > 1.0
+                || ShootAssistConstants.pitchMinPosition > ShootAssistConstants.pitchMaxPosition) {
+            return null;
+        }
+        double[][] points = new double[near.length + far.length][];
+        System.arraycopy(near, 0, points, 0, near.length);
+        System.arraycopy(far, 0, points, near.length, far.length);
+        for (int i = 0; i < points.length; i++) {
+            double[] point = points[i];
+            if (point == null || point.length != 3
+                    || !isDistancePointValid(point[0], point[1], point[2])
+                    || (i > 0 && point[0] <= points[i - 1][0])) return null;
+        }
+        return points;
+    }
+
+    private static boolean isDistancePointValid(double distanceCm, double velocity, double pitch) {
+        return Double.isFinite(distanceCm) && distanceCm > 0.0
+                && Double.isFinite(velocity) && velocity > 0.0
+                && Double.isFinite(pitch) && pitch >= ShootAssistConstants.pitchMinPosition
+                && pitch <= ShootAssistConstants.pitchMaxPosition;
+    }
+
+    /** Overtune setPitchPosition onto Spinup's two pitch servos (Shooter clamps to 0..1). */
+    public void setPitchPosition(double position) {
+        if (!Double.isFinite(position)
+                || !Double.isFinite(ShootAssistConstants.pitchMinPosition)
+                || !Double.isFinite(ShootAssistConstants.pitchMaxPosition)
+                || ShootAssistConstants.pitchMinPosition < 0.0
+                || ShootAssistConstants.pitchMaxPosition > 1.0
+                || ShootAssistConstants.pitchMinPosition > ShootAssistConstants.pitchMaxPosition) {
+            stop();
+            return;
+        }
+        double clippedPosition = Math.max(ShootAssistConstants.pitchMinPosition,
+                Math.min(ShootAssistConstants.pitchMaxPosition, position));
+        shooter.adjustPitch(clippedPosition - shooter.getPitchPosition());
+        trackPitch(); // Restarts the pitch settle timer when the change exceeds the threshold.
     }
 
     public boolean isPitchReady() {

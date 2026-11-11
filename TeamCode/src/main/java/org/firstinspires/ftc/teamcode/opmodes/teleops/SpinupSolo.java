@@ -35,7 +35,6 @@ import org.firstinspires.ftc.teamcode.subsystems.vision.ShootAssistVision;
  */
 @TeleOp(name = "solo", group = "TeleOp")
 public class SpinupSolo extends LinearOpMode {
-    private static final double INITIAL_TICKS_PER_SECOND = 900.0;
     private static final double RPM_STEP = 100.0;
     private static final double TRIGGER_THRESHOLD = 0.1; // Overtune TeleOpConstants.triggerThreshold
     private static final double OD_POLL_SECONDS = 0.05;
@@ -61,7 +60,8 @@ public class SpinupSolo extends LinearOpMode {
     private boolean shootAssistActive;
     private boolean odEnabled, odReady, lastHeadingReset, lastAlliance, lastRight, lastLeft;
     private boolean started, aimRequested, stopLatched;
-    private double targetTicksPerSecond = INITIAL_TICKS_PER_SECOND;
+    // 0 = Overtune distance table; positive = D-pad manual override (velocity only).
+    private double overrideTicksPerSecond;
     private double headingDegrees;
     private double nextOdPoll, invalidOdSince = Double.NaN;
     private String odStatus = "Waiting for Pinpoint";
@@ -83,7 +83,7 @@ public class SpinupSolo extends LinearOpMode {
                     () -> Math.toRadians(headingDegrees), () -> odReady, turn -> turn);
             shootDrive = new ShootAssistDrive(drive, () -> odEnabled ? pinpoint : null,
                     () -> odReady, driveCommand);
-            shootShooter = new ShootAssistShooter(shooter, () -> targetTicksPerSecond);
+            shootShooter = new ShootAssistShooter(shooter, () -> 1.0, () -> overrideTicksPerSecond);
             shootTransit = new ShootAssistTransit(transit, intake);
             shootIntake = new ShootAssistIntake(shootTransit);
             // Camera rides on the locked turret: the solver uses the startup (locked) angle.
@@ -112,7 +112,7 @@ public class SpinupSolo extends LinearOpMode {
                 telemetry.addLine("Spinup solo: Overtune shoot assist, chassis aim, locked turret");
                 telemetry.addLine("INIT: align turret forward. X toggles alliance. Back disables Pinpoint.");
                 telemetry.addLine("RT aim+shoot | LT intake | LB reverse | RB jam | B stop | A pre-spin");
-                telemetry.addLine("D-pad L/R flywheel speed | Gamepad 2 D-pad up/down pitch | L3 heading reset");
+                telemetry.addLine("D-pad L/R override speed, Y back to distance table | Gamepad 2 D-pad pitch | L3 heading");
                 showTelemetry();
                 sleep(20);
             }
@@ -197,13 +197,21 @@ public class SpinupSolo extends LinearOpMode {
         shootIntake.updateInputs(intakeRequested, jamRequested);
         shootTransit.stopMotor(); // Spinup's single motor follows the intake request.
         if (gamepad1.a && !jamRequested) {
-            shootShooter.setTargetVelocity(targetTicksPerSecond); // Solo manual pre-spin
+            shootShooter.setTargetVelocity(manualPreSpinTicksPerSecond()); // Solo manual pre-spin
         } else if (jamRequested || !vision.hasValidAimingTarget()) {
             shootShooter.stop();
         } else {
             shootShooter.setDistanceTarget(
-                    DistanceUnit.INCH.toCm(vision.getTargetHorizontalDistanceInches()));
+                    DistanceUnit.INCH.toCm(vision.getTargetHorizontalDistanceInches()),
+                    false); // Pre-spin only; pitch follows the shot when RT is held (Overtune).
         }
+    }
+
+    /** A pre-spin: the override if set, else the table's nearest row (Spinup default 900 TPS). */
+    private double manualPreSpinTicksPerSecond() {
+        if (overrideTicksPerSecond > 0.0) return overrideTicksPerSecond;
+        double[][] points = ShootAssistShooter.getDistanceShotPoints();
+        return points != null ? points[0][1] : 900.0;
     }
 
     private void cancelShootAssist() {
@@ -221,8 +229,11 @@ public class SpinupSolo extends LinearOpMode {
     private void updateTargetSpeedAndPitch() {
         double step = RPM_STEP * ShooterConstants.rightEncoderTicksPerRevolution / 60.0;
         double max = ShooterConstants.maxRpm * ShooterConstants.rightEncoderTicksPerRevolution / 60.0;
-        if (gamepad1.dpad_right && !lastRight) targetTicksPerSecond = Math.min(max, targetTicksPerSecond + step);
-        if (gamepad1.dpad_left && !lastLeft) targetTicksPerSecond = Math.max(0.0, targetTicksPerSecond - step);
+        double base = overrideTicksPerSecond > 0.0 ? overrideTicksPerSecond
+                : shootShooter.hasTargetVelocity() ? shootShooter.getTargetVelocity() : manualPreSpinTicksPerSecond();
+        if (gamepad1.dpad_right && !lastRight) overrideTicksPerSecond = Math.min(max, base + step);
+        if (gamepad1.dpad_left && !lastLeft) overrideTicksPerSecond = Math.max(step, base - step);
+        if (gamepad1.y) overrideTicksPerSecond = 0.0;
         lastRight = gamepad1.dpad_right;
         lastLeft = gamepad1.dpad_left;
         if (gamepad2.dpad_up) shooter.setPitchState(Shooter.PitchState.HIGH);
@@ -251,15 +262,20 @@ public class SpinupSolo extends LinearOpMode {
                 shootShooter.hasTargetVelocity()
                         ? String.format(Locale.US, "%.0f", shootShooter.getTargetVelocity()) : "off",
                 shootShooter.isReady() ? "ready" : "not ready");
-        telemetry.addData("Solo target ticks/s", "%.0f (ready +/-%.0f)", targetTicksPerSecond,
+        telemetry.addData("Speed source", overrideTicksPerSecond > 0.0
+                ? String.format(Locale.US, "D-pad override %.0f ticks/s (Y = table)", overrideTicksPerSecond)
+                : ShootAssistShooter.areDistanceShotValuesValid() ? "distance table" : "distance table INVALID");
+        telemetry.addData("Ready window", "+/-%.0f ticks/s",
                 ShootAssistConstants.readyEnterToleranceTicksPerSecond);
         telemetry.addData("Pinpoint", odStatus);
         telemetry.addData("Localization", shootDrive.getLocalizationStatus());
         telemetry.addData("Vision", vision.getPoseStatus());
         telemetry.addData("Calibration", vision.getCalibrationStatus());
         double distanceIn = vision.getTargetHorizontalDistanceInches();
-        telemetry.addData("Shot distance cm", Double.isFinite(distanceIn)
-                ? String.format(Locale.US, "%.1f", DistanceUnit.INCH.toCm(distanceIn)) : "n/a");
+        // Same vision-calibrated Pinpoint pose used for aiming; park and record this for the table.
+        telemetry.addData("Shot distance cm (robot center to CELL)", Double.isFinite(distanceIn)
+                ? String.format(Locale.US, "%.1f", DistanceUnit.INCH.toCm(distanceIn))
+                : "waiting for vision-calibrated position");
         if (aimRequested) {
             telemetry.addData("Turn output", "%+.3f", autoAim.getRawTurnPower());
             telemetry.addData("Position hold", shootAssist.isPositionHoldLocked() ? "locked" : "moving/off");

@@ -142,3 +142,4 @@ Solo不再创建Limelight/VisionLocalization/VisionCellChassisAimCommand；X选�
 - 按键：RT 瞄准射击，LT 吸球，LB 反转，RB 排堵，B 停止，A 手动预转，X 切红蓝，D-pad 左右调转速，手柄 2 D-pad 上下切俯仰，L3 重设无头方向，INIT 时按住 Back 关闭 Pinpoint。
 - `AutoShootCommand` 已移植，未被任何自动调用。
 - 验证：`python3 tools/shoot_assist_tests/run.py`。`tools/solo_tests` 针对旧 Solo（SequencedShotCommand 版）编写，已不适用。
+- 自适应射击（2026-11-11 20:20）：`ShootAssistShooter.setDistanceTarget` 照抄 Overtune 距离表算法（近/远各 5 行插值、超出端点钳位、RT 时俯仰跟随、预转不动俯仰、正值覆盖只换转速）。距离来自 Limelight 校准后的 Pinpoint 底盘位置。表在 `ShootAssistConstants.near/farShotPoints`，Spinup 尚无实测数据，目前每行都是 900 TPS / 俯仰 0.50（行为与之前相同），停车后按遥测 "Shot distance cm" 填表。D-pad 左右设手动转速覆盖，Y 恢复查表。
